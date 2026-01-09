@@ -9,7 +9,7 @@ interface TitleScreenProps {
 
 export default function TitleScreen({ onEnter }: TitleScreenProps) {
     return (
-        <Stack align="center" justify="center" h="100vh" gap="xl">
+        <Stack align="center" justify="center" h="100vh" gap="xl" px={{ base: 'md', sm: 0 }}>
             <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -19,8 +19,8 @@ export default function TitleScreen({ onEnter }: TitleScreenProps) {
                     order={1}
                     size="3.5rem"
                     c="gold"
-                    className="title-glow"
-                    style={{ fontFamily: "'Noto Serif KR', serif", letterSpacing: '0.2em' }}
+                    className="title-glow main-title"
+                    style={{ fontFamily: "'Noto Serif KR', serif", letterSpacing: '0.2em', textAlign: 'center' }}
                 >
                     별의 속삭임
                 </Title>
@@ -31,7 +31,7 @@ export default function TitleScreen({ onEnter }: TitleScreenProps) {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 1, duration: 1 }}
             >
-                <Text c="gray.3" size="lg" style={{ letterSpacing: '0.1em' }}>
+                <Text c="gray.3" size="lg" className="subtitle-text" style={{ letterSpacing: '0.1em', textAlign: 'center' }}>
                     운명을 읽는 그들의 목소리
                 </Text>
             </motion.div>

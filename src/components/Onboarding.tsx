@@ -105,7 +105,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     ];
 
     return (
-        <Box maw={400} mx="auto" mt={100} p="xl" className="dialogue-box">
+        <Box
+            maw={400}
+            mx="auto"
+            mt={{ base: 40, sm: 100 }}
+            p={{ base: 'md', sm: 'xl' }}
+            className="dialogue-box"
+            w={{ base: '95%', sm: 'auto' }}
+        >
             <AnimatePresence mode="wait">
                 {steps[step]}
             </AnimatePresence>

@@ -30,6 +30,13 @@ The JSON structure must be:
   "emotion": "one of: default, angry, smile, frust"
 }
 
+[TEXT FORMATTING]
+- Add a line break after EVERY sentence for better readability.
+- Separate different thoughts into different lines.
+- Keep sentences concise and meaningful.
+- Use proper punctuation (. ! ? 。 ! ?).
+
+[EMOTION GUIDE]
 - "default": Normal, calm, or serious.
 - "angry": Angry, annoyed, or intense.
 - "smile": Happy, amused, or seductive.
