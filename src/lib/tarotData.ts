@@ -1,0 +1,96 @@
+export interface TarotCard {
+    id: string;
+    name: string;
+    image: string;
+    meaning: string;
+}
+
+export const TAROT_CARDS: TarotCard[] = [
+    // Major Arcana
+    { id: 'major_0', name: '0. 바보 (The Fool)', image: '/photo/card/0. 바보 카드.jpg', meaning: '시작, 자유, 모험 / 준비가 부족해도 본능을 믿고 첫발을 내디디세요.' },
+    { id: 'major_1', name: '1. 마법사 (The Magician)', image: '/photo/card/1. 마법사 카드.jpg', meaning: '능력, 창의성, 자기표현 / 당신에겐 이미 모든 도구가 갖춰져 있습니다. 실행에 옮기세요.' },
+    { id: 'major_2', name: '2. 고위 여사제 (The High Priestess)', image: '/photo/card/2. 여사제 카드.jpg', meaning: '직관, 통찰, 지혜 / 겉으로 드러난 것보다 내면의 목소리와 이면의 진실을 살피세요.' },
+    { id: 'major_3', name: '3. 여황제 (The Empress)', image: '/photo/card/3. 여황제 카드.jpg', meaning: '풍요, 모성애, 결실 / 현재 상황은 풍족하게 결실을 맺을 것입니다. 포용력을 가지세요.' },
+    { id: 'major_4', name: '4. 황제 (The Emperor)', image: '/photo/card/4. 황제 카드.jpg', meaning: '권위, 질서, 안정 / 체계와 규칙이 필요합니다. 리더십을 발휘하여 질서를 잡으세요.' },
+    { id: 'major_5', name: '5. 교황 (The Hierophant)', image: '/photo/card/5. 교황 카드.jpg', meaning: '전통, 교육, 신념 / 전문가나 멘토의 조언을 구하고 정석적인 방법을 따르세요.' },
+    { id: 'major_6', name: '6. 연인 (The Lovers)', image: '/photo/card/6. 연인 카드.jpg', meaning: '선택, 사랑, 조화 / 중요한 선택의 기로입니다. 당신의 가치관에 맞는 결정을 내리세요.' },
+    { id: 'major_7', name: '7. 전차 (The Chariot)', image: '/photo/card/7. 전차 카드.jpg', meaning: '추진력, 승리, 극복 / 목표가 정해졌다면 망설이지 말고 강하게 밀어붙여야 할 때입니다.' },
+    { id: 'major_8', name: '8. 힘 (Strength)', image: '/photo/card/8. 힘 카드.jpg', meaning: '인내, 통제, 용기 / 강압적인 태도보다 인내심과 유연함으로 상대를 설득하세요.' },
+    { id: 'major_9', name: '9. 은둔자 (The Hermit)', image: '/photo/card/9. 은둔자 카드.jpg', meaning: '성찰, 고독, 탐구 / 잠시 멈춰서 내면을 들여다보고 혼자만의 시간을 가지며 답을 찾으세요.' },
+    { id: 'major_10', name: '10. 운명의 수레바퀴 (Wheel of Fortune)', image: '/photo/card/10. 운명의 수레바퀴.jpg', meaning: '변화, 전환점, 행운 / 거스를 수 없는 큰 변화가 오고 있습니다. 흐름에 몸을 맡기세요.' },
+    { id: 'major_11', name: '11. 정의 (Justice)', image: '/photo/card/11. 정의 카드.jpg', meaning: '공정, 균형, 결단 / 감정보다는 이성적이고 객관적인 판단이 필요한 시기입니다.' },
+    { id: 'major_12', name: '12. 매달린 사람 (The Hanged Man)', image: '/photo/card/12. 행맨 카드.jpg', meaning: '희생, 정지, 새로운 시각 / 당장의 행동보다는 관점을 바꿔서 상황을 바라보는 인내가 필요합니다.' },
+    { id: 'major_13', name: '13. 죽음 (Death)', image: '/photo/card/13. 죽음 카드.jpg', meaning: '종결, 이별, 새로운 시작 / 끝내야 할 것은 과감히 끝내야 새로운 기회가 찾아옵니다.' },
+    { id: 'major_14', name: '14. 절제 (Temperance)', image: '/photo/card/14. 절제 카드.jpg', meaning: '조절, 중용, 화합 / 서로 다른 요소들을 잘 조화시켜 적절한 타협점을 찾으세요.' },
+    { id: 'major_15', name: '15. 악마 (The Devil)', image: '/photo/card/15. 악마 카드.jpg', meaning: '속박, 유혹, 집착 / 욕망에 휘둘리고 있지는 않은지 스스로의 상태를 점검하세요.' },
+    { id: 'major_16', name: '16. 탑 (The Tower)', image: '/photo/card/16. 타워 카드.jpg', meaning: '붕괴, 급변, 충격 / 갑작스러운 변화가 힘들겠지만, 잘못된 기반을 무너뜨리는 과정입니다.' },
+    { id: 'major_17', name: '17. 별 (The Star)', image: '/photo/card/17. 별 카드.jpg', meaning: '희망, 영감, 치유 / 어둠 속에서도 희망을 잃지 마세요. 당신의 꿈은 실현 가능합니다.' },
+    { id: 'major_18', name: '18. 달 (The Moon)', image: '/photo/card/18. 달 카드.jpg', meaning: '불안, 모호함, 직관 / 앞이 보이지 않아 불안할 수 있습니다. 직관을 믿고 천천히 나아가세요.' },
+    { id: 'major_19', name: '19. 태양 (The Sun)', image: '/photo/card/19. 태양 카드.jpg', meaning: '성공, 활력, 기쁨 / 모든 것이 명확해지고 긍정적인 에너지가 넘칩니다. 자신감을 가지세요.' },
+    { id: 'major_20', name: '20. 심판 (Judgement)', image: '/photo/card/20. 심판 카드.jpg', meaning: '부활, 보상, 결단 / 과거의 노력이 결실을 맺습니다. 중대한 결정을 내려야 할 시점입니다.' },
+    { id: 'major_21', name: '21. 세계 (The World)', image: '/photo/card/21. 세계 카드.jpg', meaning: '완성, 통합, 여행 / 한 단계가 완벽하게 마무리되었습니다. 더 넓은 세상으로 나아가세요.' },
+
+    // Wands
+    { id: 'wands_ace', name: 'Wands Ace', image: '/photo/card/완드 에이스.jpg', meaning: '새로운 시작, 에너지 / 강력한 아이디어나 사업적 기회가 왔으니 잡으세요.' },
+    { id: 'wands_2', name: 'Wands 2', image: '/photo/card/완드2.jpg', meaning: '계획, 결정, 해외운 / 현재의 안정을 넘어 다음 단계를 위한 확장 계획을 세우세요.' },
+    { id: 'wands_3', name: 'Wands 3', image: '/photo/card/완드3.jpg', meaning: '협력, 확장, 기다림 / 당신의 비전이 멀리 뻗어 나가고 있습니다. 파트너와 협력하세요.' },
+    { id: 'wands_4', name: 'Wands 4', image: '/photo/card/완드4.jpg', meaning: '축하, 안정, 휴식 / 기초가 튼튼해졌습니다. 성과를 즐기고 에너지를 충전하세요.' },
+    { id: 'wands_5', name: 'Wands 5', image: '/photo/card/완드5.jpg', meaning: '경쟁, 갈등, 투쟁 / 불필요한 마찰이 많습니다. 에너지를 한곳으로 집중시키세요.' },
+    { id: 'wands_6', name: 'Wands 6', image: '/photo/card/완드6.jpg', meaning: '승리, 인정, 소식 / 당신의 노력이 대중에게 인정받습니다. 좋은 소식이 들려올 것입니다.' },
+    { id: 'wands_7', name: 'Wands 7', image: '/photo/card/완드7.jpg', meaning: '방어, 용기, 도전 / 주변의 압박이 있으나 소신을 지키고 자리를 사수하세요.' },
+    { id: 'wands_8', name: 'Wands 8', image: '/photo/card/완드8.jpg', meaning: '속도, 소통, 변화 / 상황이 급박하게 돌아갑니다. 빠른 판단과 대응이 필요합니다.' },
+    { id: 'wands_9', name: 'Wands 9', image: '/photo/card/완드9.jpg', meaning: '경계, 인내, 마지막 단계 / 거의 다 왔습니다. 지치더라도 끝까지 방심하지 마세요.' },
+    { id: 'wands_10', name: 'Wands 10', image: '/photo/card/완드10.jpg', meaning: '과부하, 책임감, 압박 / 혼자 너무 많은 짐을 지고 있습니다. 일을 나누거나 정리하세요.' },
+    { id: 'wands_page', name: 'Wands Page', image: '/photo/card/완드 페이지.jpg', meaning: '호기심, 새로운 소식 / 새로운 분야에 대한 탐구를 시작하기 좋은 때입니다.' },
+    { id: 'wands_knight', name: 'Wands Knight', image: '/photo/card/완드 나이트.jpg', meaning: '모험, 성급함, 열정 / 추진력은 좋으나 속도 조절이 필요합니다. 무모함을 경계하세요.' },
+    { id: 'wands_queen', name: 'Wands Queen', image: '/photo/card/완드 퀸.jpg', meaning: '매력, 자신감, 사교성 / 당신의 에너지가 주변에 영향을 줍니다. 당당하게 행동하세요.' },
+    { id: 'wands_king', name: 'Wands King', image: '/photo/card/완드 킹.jpg', meaning: '리더십, 야망, 권위 / 확실한 목표 의식을 가지고 전체를 진두지휘하세요.' },
+
+    // Cups
+    { id: 'cups_ace', name: 'Cups Ace', image: '/photo/card/컵 에이스.jpg', meaning: '새로운 감정, 사랑, 직관 / 마음이 열리는 시기입니다. 새로운 관계나 제안을 받아들이세요.' },
+    { id: 'cups_2', name: 'Cups 2', image: '/photo/card/컵2.jpg', meaning: '결합, 우정, 계약 / 마음이 맞는 상대를 만납니다. 조화로운 관계가 형성됩니다.' },
+    { id: 'cups_3', name: 'Cups 3', image: '/photo/card/컵3.jpg', meaning: '축배, 화합, 공동체 / 주변 사람들과 기쁨을 나누세요. 대인관계에서 큰 즐거움이 있습니다.' },
+    { id: 'cups_4', name: 'Cups 4', image: '/photo/card/컵4.jpg', meaning: '권태, 무관심, 명상 / 새로운 기회를 눈앞에 두고도 놓칠 수 있습니다. 마음을 환기하세요.' },
+    { id: 'cups_5', name: 'Cups 5', image: '/photo/card/컵5.jpg', meaning: '상실, 후회, 슬픔 / 잃어버린 것에 집중하지 말고 아직 남아있는 소중한 것을 보세요.' },
+    { id: 'cups_6', name: 'Cups 6', image: '/photo/card/컵6.jpg', meaning: '추억, 재회, 순수함 / 과거의 인연이나 익숙한 환경에서 해답이나 위안을 찾게 됩니다.' },
+    { id: 'cups_7', name: 'Cups 7', image: '/photo/card/컵7.jpg', meaning: '환상, 선택 장애, 꿈 / 너무 많은 생각은 혼란을 줍니다. 실현 가능한 목표 하나에 집중하세요.' },
+    { id: 'cups_8', name: 'Cups 8', image: '/photo/card/컵8.jpg', meaning: '이탈, 포기, 여정 / 더 높은 가치를 위해 미련 없이 자리를 떠날 용기가 필요합니다.' },
+    { id: 'cups_9', name: 'Cups 9', image: '/photo/card/컵9.jpg', meaning: '만족, 소원 성취, 풍요 / 심리적으로 매우 만족스러운 상태입니다. 스스로를 칭찬해주셔도 좋습니다.' },
+    { id: 'cups_10', name: 'Cups 10', image: '/photo/card/컵10.jpg', meaning: '행복, 가족, 완성 / 관계의 정점입니다. 가족이나 연인과 최고의 행복을 누리게 됩니다.' },
+    { id: 'cups_page', name: 'Cups Page', image: '/photo/card/컵 페이지.jpg', meaning: '감수성, 다정함, 상상 / 순수한 마음으로 주변에 다가가세요. 따뜻한 감동이 찾아옵니다.' },
+    { id: 'cups_knight', name: 'Cups Knight', image: '/photo/card/컵 나이트.jpg', meaning: '고백, 제안, 로맨틱 / 진심이 담긴 제안이 옵니다. 감정에 충실한 선택을 하세요.' },
+    { id: 'cups_queen', name: 'Cups Queen', image: '/photo/card/컵 퀸.jpg', meaning: '자애로움, 직관, 감성 / 주변을 보듬는 포용력이 필요합니다. 당신의 직관을 믿으세요.' },
+    { id: 'cups_king', name: 'Cups King', image: '/photo/card/컵 킹.jpg', meaning: '평정심, 배려, 성숙 / 감정을 잘 다스려야 합니다. 너그러운 마음으로 상황을 포용하세요.' },
+
+    // Swords
+    { id: 'swords_ace', name: 'Swords Ace', image: '/photo/card/소드 에이스.jpg', meaning: '명확한 결단, 승리, 진실 / 이성적인 판단으로 문제를 돌파하세요. 승리의 기회가 왔습니다.' },
+    { id: 'swords_2', name: 'Swords 2', image: '/photo/card/소드2.jpg', meaning: '대립, 균형, 외면 / 어려운 결정을 피하고 있습니다. 눈가리개를 벗고 직시하세요.' },
+    { id: 'swords_3', name: 'Swords 3', image: '/photo/card/소드3.jpg', meaning: '상처, 이별, 비통 / 마음은 아프지만 이성적인 청산이 필요한 과정입니다.' },
+    { id: 'swords_4', name: 'Swords 4', image: '/photo/card/소드4.jpg', meaning: '휴식, 명상, 은신 / 치열한 상황에서 벗어나 재충전이 시급합니다. 잠시 멈추세요.' },
+    { id: 'swords_5', name: 'Swords 5', image: '/photo/card/소드5.jpg', meaning: '패배, 불명예, 갈등 / 이기더라도 상처뿐인 승리일 수 있습니다. 실리를 먼저 챙기세요.' },
+    { id: 'swords_6', name: 'Swords 6', image: '/photo/card/소드6.jpg', meaning: '이동, 회복, 해결 / 힘든 시기를 지나 점차 안정적인 상황으로 나아갑니다.' },
+    { id: 'swords_7', name: 'Swords 7', image: '/photo/card/소드7.jpg', meaning: '기만, 술수, 신중 / 정공법이 통하지 않을 수 있습니다. 전략적으로 대처하고 도난을 주의하세요.' },
+    { id: 'swords_8', name: 'Swords 8', image: '/photo/card/소드8.jpg', meaning: '구속, 고립, 무기력 / 당신을 묶고 있는 것은 당신의 생각입니다. 스스로 틀을 깨고 나오세요.' },
+    { id: 'swords_9', name: 'Swords 9', image: '/photo/card/소드9.jpg', meaning: '불안, 악몽, 스트레스 / 걱정이 과도합니다. 실제로 일어날 일보다 생각이 더 큰 고통을 줍니다.' },
+    { id: 'swords_10', name: 'Swords 10', image: '/photo/card/소드10.jpg', meaning: '파국, 고통, 끝 / 최악의 상황은 지났습니다. 이제 바닥을 치고 올라올 일만 남았습니다.' },
+    { id: 'swords_page', name: 'Swords Page', image: '/photo/card/소드 페이지.jpg', meaning: '경계, 통찰, 첩보 / 정보를 수집하고 주변 상황을 예리하게 관찰하며 기회를 엿보세요.' },
+    { id: 'swords_knight', name: 'Swords Knight', image: '/photo/card/소드 나이트.jpg', meaning: '용맹, 성급함, 단절 / 앞뒤 가리지 않는 추진력은 위험합니다. 논리적 근거를 확보하세요.' },
+    { id: 'swords_queen', name: 'Swords Queen', image: '/photo/card/소드 퀸.jpg', meaning: '냉철함, 독립심, 비판 / 감정에 휘둘리지 말고 원칙대로 공정하게 일을 처리하세요.' },
+    { id: 'swords_king', name: 'Swords King', image: '/photo/card/소드 킹.jpg', meaning: '지성, 전문성, 공정 / 전문가의 시각으로 판단하세요. 논리적 설득력이 핵심입니다.' },
+
+    // Pentacles
+    { id: 'pentacles_ace', name: 'Pentacles Ace', image: '/photo/card/펜타클 에이스.jpg', meaning: '금전적 기회, 번영, 기초 / 실질적인 수익이나 가치 있는 제안이 시작되는 시기입니다.' },
+    { id: 'pentacles_2', name: 'Pentacles 2', image: '/photo/card/펜타클2.jpg', meaning: '균형, 융통성, 멀티태스킹 / 유연한 자금 운용이 필요합니다. 우선순위를 잘 정하세요.' },
+    { id: 'pentacles_3', name: 'Pentacles 3', image: '/photo/card/펜타클3.jpg', meaning: '협력, 기술, 장인정신 / 전문가들과 팀을 이뤄 성과를 내세요. 당신의 능력이 빛납니다.' },
+    { id: 'pentacles_4', name: 'Pentacles 4', image: '/photo/card/펜타클4.jpg', meaning: '소유욕, 집착, 안정 / 가진 것을 지키는 것도 좋으나 너무 인색하면 기회를 놓칩니다.' },
+    { id: 'pentacles_5', name: 'Pentacles 5', image: '/photo/card/펜타클5.jpg', meaning: '경제적 어려움, 고립 / 힘든 시기입니다. 혼자 앓지 말고 주변의 도움을 요청하세요.' },
+    { id: 'pentacles_6', name: 'Pentacles 6', image: '/photo/card/펜타클6.jpg', meaning: '자선, 보상, 관용 / 노력한 만큼의 대가가 들어오며, 베풂이 더 큰 이득으로 돌아옵니다.' },
+    { id: 'pentacles_7', name: 'Pentacles 7', image: '/photo/card/펜타클7.jpg', meaning: '보상 대기, 평가, 신중 / 지금까지의 성과를 중간 점검하고 다음 수확을 기다리세요.' },
+    { id: 'pentacles_8', name: 'Pentacles 8', image: '/photo/card/펜타클8.jpg', meaning: '성실, 숙련, 공부 / 꾸준함이 답입니다. 자기 분야에서 숙련도를 높이면 반드시 성공합니다.' },
+    { id: 'pentacles_9', name: 'Pentacles 9', image: '/photo/card/펜타클9.jpg', meaning: '여유, 독립적 부, 성취 / 경제적으로 자립하고 우아한 생활을 누리게 되는 시점입니다.' },
+    { id: 'pentacles_10', name: 'Pentacles 10', image: '/photo/card/펜타클10.jpg', meaning: '상속, 가족의 부, 완성 / 안정적인 기반이 완성되었습니다. 부의 세습이나 큰 이익이 있습니다.' },
+    { id: 'pentacles_page', name: 'Pentacles Page', image: '/photo/card/펜타클 페이지.jpg', meaning: '실무, 학습, 신중함 / 작은 이익이라도 소중히 여기고 성실하게 기초를 다지세요.' },
+    { id: 'pentacles_knight', name: 'Pentacles Knight', image: '/photo/card/펜타클 나이트.jpg', meaning: '성실, 신뢰, 보수적 / 속도는 느리지만 가장 확실한 결과를 가져다줍니다. 꾸준하세요.' },
+    { id: 'pentacles_queen', name: 'Pentacles Queen', image: '/photo/card/펜타클 퀸.jpg', meaning: '풍요, 안락, 실용성 / 당신의 자산과 주변 사람들을 따뜻하고 실속 있게 챙기세요.' },
+    { id: 'pentacles_king', name: 'Pentacles King', image: '/photo/card/펜타클 킹.jpg', meaning: '재력, 성공, 사업가 / 최고의 재물운입니다. 현실적인 감각으로 큰 성과를 거두세요.' },
+];
