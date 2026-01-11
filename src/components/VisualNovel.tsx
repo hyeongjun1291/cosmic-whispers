@@ -16,10 +16,9 @@ interface VisualNovelProps {
     userName: string;
     history: Message[];
     onSendMessage: (msg: string) => void;
-    onOpenSettings: () => void;
+    onSwitchToCharacter: (id: string) => void;
     isTyping: boolean;
     characterId: string;
-    onChangeCharacter: () => void;
     dashboard?: React.ReactNode;
 }
 
@@ -27,10 +26,9 @@ export default function VisualNovel({
     userName,
     history,
     onSendMessage,
-    onOpenSettings,
     isTyping,
     characterId,
-    onChangeCharacter,
+    onSwitchToCharacter,
     dashboard
 }: VisualNovelProps) {
     const [inputText, setInputText] = useState('');
@@ -40,6 +38,7 @@ export default function VisualNovel({
 
     // Format text with line breaks
     const formatText = (text: string) => {
+        if (!text) return '';
         return text
             .replace(/(\.{3}|[.!?。!?])\s*/g, '$1\n')
             .replace(/\n{3,}/g, '\n\n');
@@ -89,29 +88,35 @@ export default function VisualNovel({
             <Box className="oriental-pattern" style={{ position: 'absolute', inset: 0, zIndex: 0 }} />
 
             {/* Top Controls */}
-            <Group className="top-controls" gap="xs">
-                <Tooltip label="상대 변경">
-                    <ActionIcon
-                        variant="subtle"
-                        color="gray"
-                        onClick={onChangeCharacter}
-                        size="lg"
-                    >
-                        <IconUsers size={24} />
-                    </ActionIcon>
-                </Tooltip>
-
-                <Tooltip label="설정">
-                    <ActionIcon
-                        variant="subtle"
-                        color="gold"
-                        onClick={onOpenSettings}
-                        size="lg"
-                    >
-                        <IconSettings size={24} />
-                    </ActionIcon>
-                </Tooltip>
-            </Group>
+            {/* Top Controls - REMOVED per request */}
+            {/* Floating Character Nav */}
+            <Box style={{ position: 'absolute', left: 20, top: '50%', transform: 'translateY(-50%)', zIndex: 50 }} visibleFrom="sm">
+                <Stack gap="md" align="center" style={{ backgroundColor: 'transparent', padding: '10px' }}>
+                    {Object.values(CHARACTERS).map((char) => (
+                        <Tooltip key={char.id} label={char.name} position="right" withArrow>
+                            <button
+                                onClick={() => onSwitchToCharacter(char.id)}
+                                className="nav-custom-btn"
+                                style={{
+                                    opacity: characterId === char.id ? 1 : 0.6,
+                                    filter: characterId === char.id ? 'drop-shadow(0 0 5px gold)' : 'grayscale(0.5)'
+                                }}
+                            >
+                                <img
+                                    src={`/images/ui/nav_${char.id}.png`}
+                                    alt={char.name}
+                                    onError={(e) => {
+                                        // Fallback to old avatar if custom asset missing (Temporary dev aid)
+                                        e.currentTarget.src = `/images/characters/${char.imageNumber}_default.jpg`;
+                                        e.currentTarget.style.objectFit = 'cover';
+                                        e.currentTarget.style.borderRadius = '50%';
+                                    }}
+                                />
+                            </button>
+                        </Tooltip>
+                    ))}
+                </Stack>
+            </Box>
 
             {/* Main Layout: Desktop - 3 Columns, Mobile - Full Screen with Overlay */}
             <Box className="main-layout">

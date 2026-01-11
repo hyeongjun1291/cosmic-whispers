@@ -13,7 +13,14 @@ export async function generateCharacterResponse(
     sajuSummary: string,
     history: { role: 'user' | 'model'; text: string; emotion?: string }[]
 ): Promise<ChatResponse> {
-    const groq = new Groq({ apiKey, dangerouslyAllowBrowser: true });
+    console.log('[Groq] Initializing with character:', characterId);
+
+    if (!apiKey) {
+        console.error('[Groq] API key is missing!');
+        throw new Error('Groq API key is required');
+    }
+
+    const groq = new Groq({ apiKey }); // 서버 사이드에서는 dangerouslyAllowBrowser 불필요
 
     const character = CHARACTERS[characterId] || CHARACTERS['cheongsan'];
 
@@ -53,6 +60,8 @@ The JSON structure must be:
         { role: 'user', content: userMessage }
     ];
 
+    console.log('[Groq] Sending request with', messages.length, 'messages');
+
     try {
         const chatCompletion = await groq.chat.completions.create({
             messages: messages,
@@ -62,6 +71,7 @@ The JSON structure must be:
             response_format: { type: 'json_object' }
         });
 
+        console.log('[Groq] Received response');
         const rawContent = chatCompletion.choices[0]?.message?.content || "{}";
         const parsed = JSON.parse(rawContent);
 
@@ -70,12 +80,12 @@ The JSON structure must be:
             emotion: parsed.emotion || 'default'
         };
     } catch (e) {
-        console.error("JSON Parse Error or API Error", e);
-        // Fallback if model fails to output JSON (or if model is strictly plain text)
-        // We can try to guess or just default
-        return {
-            text: "...",
-            emotion: 'default'
-        };
+        console.error("[Groq] Error occurred:");
+        console.error("Error:", e);
+        console.error("Error message:", e instanceof Error ? e.message : String(e));
+        console.error("Error stack:", e instanceof Error ? e.stack : 'No stack');
+
+        // Re-throw to let the API route handle it
+        throw e;
     }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { calculateSaju, SajuData } from '@/lib/saju';
 import { generateCharacterResponse } from '@/lib/groq';
 import Onboarding from '@/components/Onboarding';
@@ -17,16 +17,19 @@ import { Box, Drawer, ActionIcon, Modal, Text, Group, Stack } from '@mantine/cor
 import { useDisclosure } from '@mantine/hooks';
 import { IconLayoutDashboard } from '@tabler/icons-react';
 import dayjs from 'dayjs';
+import { Turnstile, TurnstileInstance } from '@marsidev/react-turnstile';
 
 export default function Home() {
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null); // Revert session check
   const [saju, setSaju] = useState<SajuData | null>(null);
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [history, setHistory] = useState<any[]>([]);
-  const [apiKey, setApiKey] = useState(process.env.NEXT_PUBLIC_GROQ_API_KEY || '');
+  // const [apiKey, setApiKey] = useState(process.env.NEXT_PUBLIC_GROQ_API_KEY || ''); // Not used on client anymore
   const [isTyping, setIsTyping] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [showTitle, setShowTitle] = useState(true);
+  const [showTitle, setShowTitle] = useState(true); // Restored
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   // Existing Modals & State
   const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
@@ -45,18 +48,14 @@ export default function Home() {
 
   const [confirmConfig, setConfirmConfig] = useState({ title: '', message: '', action: () => { } });
   const [alertMessage, setAlertMessage] = useState('');
+  const [emailOptIn, setEmailOptIn] = useState('');
   const [clearHistoryOnSwitch, setClearHistoryOnSwitch] = useState(false);
 
   useEffect(() => {
-    // Load API Key only
-    const savedKey = localStorage.getItem('cosmic_api_key');
-    if (savedKey) setApiKey(savedKey);
     setIsInitialized(true);
   }, []);
 
-  useEffect(() => {
-    if (apiKey) localStorage.setItem('cosmic_api_key', apiKey);
-  }, [apiKey]);
+  // Removed apiKey local storage logic as it's server-side now
 
   const handleOnboardingComplete = (data: any) => {
     setUserData(data);
@@ -125,10 +124,32 @@ export default function Home() {
       // Construct a special prompt for the first message
       const cardContext = `User drew the Tarot card: ${card.name}.\nMeaning: ${card.meaning}\n\nInterpret this card for the user as your first greeting.`;
 
-      // We need to call generic API but with this context. 
-      // `generateCharacterResponse` takes `sajuSummary`. We can hijack that parameter for Tarot context since Zion doesn't use Saju.
-      const response = await generateCharacterResponse(apiKey, charId, "행운의 카드를 뽑았습니다. 해석해주세요.", cardContext, []);
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: "행운의 카드를 뽑았습니다. 해석해주세요.",
+          characterId: charId,
+          context: cardContext,
+          history: [],
+          turnstileToken // Send token
+        })
+      });
 
+      if (res.status === 429) {
+        setAlertMessage('하루 대화 가능 횟수(20회)를 초과했습니다. 내일 다시 와주세요!');
+        openAlertModal();
+        setHistory([{ role: 'model', text: "오늘의 인연은 여기까지인 것 같군요. 내일 다시 만나요.", emotion: 'default' }]);
+        return;
+      }
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error(`Chat API Error: ${res.status} ${res.statusText}`, errText);
+        throw new Error(`Chat API Error: ${res.status} - ${errText}`);
+      }
+
+      const response = await res.json();
       setHistory([{ role: 'model', text: response.text, emotion: response.emotion }]);
     } catch (e) {
       console.error(e);
@@ -166,11 +187,7 @@ export default function Home() {
   };
 
   const handleSendMessage = async (text: string) => {
-    if (!apiKey) {
-      setAlertMessage('API 키가 설정되지 않았습니다. .env.local 파일을 확인해주세요.');
-      openAlertModal();
-      return;
-    }
+    console.log('[Client] Sending message, token:', turnstileToken ? turnstileToken.substring(0, 20) + '...' : 'EMPTY');
 
     const newHistory = [...history, { role: 'user', text }];
     setHistory(newHistory);
@@ -185,8 +202,27 @@ export default function Home() {
         context = `Selected Tarot Card: ${selectedCard.name}\nMeaning: ${selectedCard.meaning}`;
       }
 
-      const response = await generateCharacterResponse(apiKey, characterId || 'cheongsan', text, context, history);
-      // response is { text, emotion }
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          characterId: characterId || 'cheongsan',
+          context,
+          history,
+          turnstileToken // Send token
+        })
+      });
+
+      if (res.status === 429) {
+        setAlertMessage('하루 대화 가능 횟수(20회)를 초과했습니다. 내일 다시 와주세요!');
+        openAlertModal();
+        // Don't remove user message, but reply with limit message
+        setHistory([...newHistory, { role: 'model', text: "오늘의 대화 에너지가 소진되었습니다. 내일 다시 만나요.", emotion: 'default' }]);
+        return;
+      }
+
+      const response = await res.json();
       setHistory([...newHistory, { role: 'model', text: response.text, emotion: response.emotion }]);
     } catch (error) {
       console.error(error);
@@ -221,6 +257,11 @@ export default function Home() {
   };
 
   const confirmChangeCharacter = () => {
+    if (emailOptIn) {
+      console.log(`[Email Opt-in] User opted in from Char Switch: ${emailOptIn}`);
+      // In real app, post to API here
+    }
+
     if (clearHistoryOnSwitch) {
       setHistory([]);
       localStorage.removeItem('cosmic_history');
@@ -233,14 +274,14 @@ export default function Home() {
 
   if (!isInitialized) return null;
 
-  if (showTitle) {
-    return (
-      <Box mih="100vh" style={{ position: 'relative' }}>
-        <div className="starfield" />
-        <TitleScreen onEnter={() => setShowTitle(false)} />
-      </Box>
-    );
-  }
+  // Title Screen
+
+  // Title Screen logic integrated into main return to ensure Turnstile is always mounted
+
+
+  // If authenticated (implicit via Turnstile existence)
+  // ... continue to Game flow
+
 
   // Dashboard Content Reuse
   const DashboardContent = (
@@ -249,7 +290,17 @@ export default function Home() {
       {characterId === 'cheongsan' && (saju ? <SajuDashboard data={saju} /> : <Box p="md">사주 정보가 없습니다.</Box>)}
       {characterId === 'zion' && (selectedCard ? (
         <Box p="md" ta="center">
-          <img src={selectedCard.image} alt={selectedCard.name} style={{ width: '100%', borderRadius: '12px', marginBottom: '20px' }} />
+          <img
+            src={selectedCard.image}
+            alt={selectedCard.name}
+            style={{
+              width: '100%',
+              maxHeight: '300px',
+              objectFit: 'contain',
+              borderRadius: '12px',
+              marginBottom: '20px'
+            }}
+          />
           <Text size="xl" fw={700} c="gold">{selectedCard.name}</Text>
           <Text size="sm" mt="md">{selectedCard.meaning.split('/')[1]}</Text>
         </Box>
@@ -259,98 +310,150 @@ export default function Home() {
 
   return (
     <Box mih="100vh" style={{ position: 'relative' }}>
-      {/* Global Modals */}
-      <Modal opened={alertModalOpened} onClose={closeAlertModal} title="알림" centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
-        <Text mb="lg">{alertMessage}</Text>
-        <Group justify="flex-end">
-          <ActionIcon size="xl" color="gold" variant="filled" onClick={closeAlertModal}>확인</ActionIcon>
-        </Group>
-      </Modal>
+      <div className="starfield" />
 
-      <Modal opened={confirmModalOpened} onClose={closeConfirmModal} title={confirmConfig.title} centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
-        <Text mb="lg">{confirmConfig.message}</Text>
-        <Group justify="flex-end">
-          <ActionIcon color="gray" size="xl" variant="subtle" onClick={closeConfirmModal}>취소</ActionIcon>
-          <ActionIcon color="red" size="xl" variant="filled" onClick={confirmConfig.action}>확인</ActionIcon>
-        </Group>
-      </Modal>
+      {/* Invisible Turnstile Widget - Always mounted to maintain token */}
+      {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? (
+        <Box style={{ position: 'fixed', bottom: 10, right: 10, zIndex: 9999, opacity: 0, pointerEvents: 'none' }}>
+          <Turnstile
+            ref={turnstileRef}
+            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+            onSuccess={(token: string) => {
+              console.log('[Turnstile] Token received');
+              setTurnstileToken(token);
+            }}
+            onExpire={() => {
+              console.log('[Turnstile] Token expired, resetting...');
+              turnstileRef.current?.reset();
+            }}
+            onError={(error) => {
+              console.error('[Turnstile] Error:', error);
+            }}
+          />
+        </Box>
+      ) : null}
 
-      <Modal opened={changeCharModalOpened} onClose={closeChangeCharModal} title="대화 상대 변경" centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
-        <Stack gap="md">
-          <Text>대화 상대를 변경하시겠습니까?</Text>
-          <Box>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={clearHistoryOnSwitch} onChange={(e) => setClearHistoryOnSwitch(e.target.checked)} />
-              <Text size="sm">기존 대화 내용 지우기</Text>
-            </label>
-          </Box>
-          <Group justify="flex-end" mt="md">
-            <ActionIcon color="gray" size="xl" variant="subtle" onClick={closeChangeCharModal}>취소</ActionIcon>
-            <ActionIcon color="gold" size="xl" variant="filled" onClick={confirmChangeCharacter}>변경</ActionIcon>
-          </Group>
-        </Stack>
-      </Modal>
-
-      {!userData ? (
-        <Onboarding onComplete={handleOnboardingComplete} />
-      ) : !characterId ? (
-        <CharacterSelection onSelect={handleCharacterSelect} />
+      {showTitle ? (
+        <TitleScreen onEnter={() => setShowTitle(false)} />
       ) : (
         <>
-          <VisualNovel
-            userName={userData.name}
-            history={history}
-            onSendMessage={handleSendMessage}
-            onOpenSettings={openSettings}
-            isTyping={isTyping}
-            characterId={characterId}
-            onChangeCharacter={handleChangeCharacterRequest}
-            dashboard={DashboardContent}
-          />
+          {/* Global Modals */}
+          <Modal opened={alertModalOpened} onClose={closeAlertModal} title="알림" centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
+            <Text mb="lg">{alertMessage}</Text>
+            <Group justify="flex-end">
+              <ActionIcon size="xl" color="gold" variant="filled" onClick={closeAlertModal}>확인</ActionIcon>
+            </Group>
+          </Modal>
 
-          {/* Mobile Only Dashboard Button and Drawer */}
-          <Box hiddenFrom="sm">
-            <ActionIcon
-              variant="filled"
-              color="indigo"
-              size="xl"
-              onClick={toggleDashboard}
-              style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, borderRadius: '50%' }}
-            >
-              <IconLayoutDashboard size={24} />
-            </ActionIcon>
+          <Modal opened={confirmModalOpened} onClose={closeConfirmModal} title={confirmConfig.title} centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
+            <Text mb="lg">{confirmConfig.message}</Text>
+            <Group justify="flex-end">
+              <ActionIcon color="gray" size="xl" variant="subtle" onClick={closeConfirmModal}>취소</ActionIcon>
+              <ActionIcon color="red" size="xl" variant="filled" onClick={confirmConfig.action}>확인</ActionIcon>
+            </Group>
+          </Modal>
 
-            <Drawer
-              opened={dashboardOpened}
-              onClose={toggleDashboard}
-              title={characterId === 'zion' ? "당신의 타로 카드" : "당신의 운명 원국"}
-              position="left"
-              size="md"
-              styles={{ content: { background: 'var(--background)', color: 'white' } }}
-            >
-              {DashboardContent}
-            </Drawer>
-          </Box>
+          <Modal opened={changeCharModalOpened} onClose={closeChangeCharModal} title="대화 상대 변경" centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
+            <Stack gap="md">
+              <Text>대화 상대를 변경하시겠습니까?</Text>
+              <Stack gap="sm">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}>
+                  <input type="checkbox" checked={clearHistoryOnSwitch} onChange={(e) => setClearHistoryOnSwitch(e.target.checked)} />
+                  <Text size="sm">기존 대화 내용 지우기</Text>
+                </label>
 
-          <SettingsModal
-            opened={settingsOpened}
-            onClose={closeSettings}
-            onReset={handleReset}
-          />
+                <Box pt="md" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  <Text size="sm" mb={8} c="gold">정식 출시 알림 받기</Text>
+                  <input
+                    type="email"
+                    placeholder="example@email.com"
+                    value={emailOptIn}
+                    onChange={(e) => setEmailOptIn(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '4px',
+                      border: '1px solid #444',
+                      background: 'rgba(0,0,0,0.3)',
+                      color: 'white'
+                    }}
+                  />
+                </Box>
+              </Stack>
+              <Group justify="flex-end" mt="md">
+                <ActionIcon color="gray" size="xl" variant="subtle" onClick={closeChangeCharModal}>취소</ActionIcon>
+                <ActionIcon color="gold" size="xl" variant="filled" onClick={confirmChangeCharacter}>변경</ActionIcon>
+              </Group>
+            </Stack>
+          </Modal>
+
+          {!userData ? (
+            <Onboarding onComplete={handleOnboardingComplete} />
+          ) : !characterId ? (
+            <CharacterSelection onSelect={handleCharacterSelect} />
+          ) : (
+            <>
+              <VisualNovel
+                userName={userData.name}
+                history={history}
+                onSendMessage={handleSendMessage}
+                isTyping={isTyping}
+                characterId={characterId}
+                onSwitchToCharacter={(id) => {
+                  if (id === characterId) return;
+                  // Directly switch, handling prerequisites via existing handler logic if needed, 
+                  // or just set ID if we assume prerequisites (like Saju) are global.
+                  // Use handleCharacterSelect to be safe (it checks Saju/Tarot existence).
+                  handleCharacterSelect(id);
+                }}
+                dashboard={DashboardContent}
+              />
+
+              {/* Mobile Only Dashboard Button and Drawer */}
+              <Box hiddenFrom="sm">
+                <ActionIcon
+                  variant="filled"
+                  color="indigo"
+                  size="xl"
+                  onClick={toggleDashboard}
+                  style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, borderRadius: '50%' }}
+                >
+                  <IconLayoutDashboard size={24} />
+                </ActionIcon>
+
+                <Drawer
+                  opened={dashboardOpened}
+                  onClose={toggleDashboard}
+                  title={characterId === 'zion' ? "당신의 타로 카드" : "당신의 운명 원국"}
+                  position="left"
+                  size="md"
+                  styles={{ content: { background: 'var(--background)', color: 'white' } }}
+                >
+                  {DashboardContent}
+                </Drawer>
+              </Box>
+
+              <SettingsModal
+                opened={settingsOpened}
+                onClose={closeSettings}
+                onReset={handleReset}
+              />
+            </>
+          )}
+
+          <Modal opened={sajuModalOpened} onClose={closeSajuModal} title="운명 데이터 입력" centered overlayProps={{ blur: 3 }}>
+            <SajuForm onComplete={handleSajuComplete} onCancel={closeSajuModal} />
+          </Modal>
+
+          <Modal opened={tarotModalOpened} onClose={closeTarotModal} fullScreen withCloseButton={false} styles={{ content: { background: 'rgba(0,0,0,0.9)' } }}>
+            <TarotCardSelection onSelect={handleTarotComplete} onCancel={closeTarotModal} />
+          </Modal>
+
+          <Modal opened={pungryuModalOpened} onClose={closePungryuModal} fullScreen withCloseButton={false} styles={{ content: { background: '#000' } }}>
+            <PungryuGate onEnter={handlePungryuEnter} onCancel={closePungryuModal} />
+          </Modal>
         </>
       )}
-
-      <Modal opened={sajuModalOpened} onClose={closeSajuModal} title="운명 데이터 입력" centered overlayProps={{ blur: 3 }}>
-        <SajuForm onComplete={handleSajuComplete} onCancel={closeSajuModal} />
-      </Modal>
-
-      <Modal opened={tarotModalOpened} onClose={closeTarotModal} fullScreen withCloseButton={false} styles={{ content: { background: 'rgba(0,0,0,0.9)' } }}>
-        <TarotCardSelection onSelect={handleTarotComplete} onCancel={closeTarotModal} />
-      </Modal>
-
-      <Modal opened={pungryuModalOpened} onClose={closePungryuModal} fullScreen withCloseButton={false} styles={{ content: { background: '#000' } }}>
-        <PungryuGate onEnter={handlePungryuEnter} onCancel={closePungryuModal} />
-      </Modal>
     </Box>
   );
 }
