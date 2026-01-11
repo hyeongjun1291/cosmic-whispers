@@ -13,7 +13,7 @@ import SettingsModal from '@/components/SettingsModal';
 import CharacterSelection from '@/components/CharacterSelection';
 import TitleScreen from '@/components/TitleScreen';
 import { CHARACTERS } from '@/lib/characters';
-import { Box, Drawer, ActionIcon, Modal, Text } from '@mantine/core';
+import { Box, Drawer, ActionIcon, Modal, Text, Group, Stack } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconLayoutDashboard } from '@tabler/icons-react';
 import dayjs from 'dayjs';
@@ -28,13 +28,24 @@ export default function Home() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [showTitle, setShowTitle] = useState(true);
 
+  // Existing Modals & State
   const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
+  // Dashboard drawer is still used for mobile
   const [dashboardOpened, { toggle: toggleDashboard }] = useDisclosure(false);
   const [sajuModalOpened, { open: openSajuModal, close: closeSajuModal }] = useDisclosure(false);
   const [pendingCharacterId, setPendingCharacterId] = useState<string | null>(null);
   const [tarotModalOpened, { open: openTarotModal, close: closeTarotModal }] = useDisclosure(false);
   const [pungryuModalOpened, { open: openPungryuModal, close: closePungryuModal }] = useDisclosure(false);
   const [selectedCard, setSelectedCard] = useState<any>(null);
+
+  // New Alert/Confirm Modals
+  const [changeCharModalOpened, { open: openChangeCharModal, close: closeChangeCharModal }] = useDisclosure(false);
+  const [confirmModalOpened, { open: openConfirmModal, close: closeConfirmModal }] = useDisclosure(false);
+  const [alertModalOpened, { open: openAlertModal, close: closeAlertModal }] = useDisclosure(false);
+
+  const [confirmConfig, setConfirmConfig] = useState({ title: '', message: '', action: () => { } });
+  const [alertMessage, setAlertMessage] = useState('');
+  const [clearHistoryOnSwitch, setClearHistoryOnSwitch] = useState(false);
 
   useEffect(() => {
     // Load API Key only
@@ -101,20 +112,6 @@ export default function Home() {
 
     if (pendingCharacterId) {
       setCharacterId(pendingCharacterId);
-      // Initial greeting for Zion with Tarot context
-      // We set a special greeting here usually, but the AI will generate the actual reading immediately.
-      // Let's set a placeholder greeting and then immediately trigger the AI response?
-      // Or we can manually set the history with a system instruction pretending to be the model's first message?
-      // The prompt logic expects `sajuSummary`. We can pass `cardSummary` instead.
-
-      // Let's make the user "send" a hidden system message or just start with an empty history 
-      // and let the `useEffect` or `handleSendMessage` trigger?
-      // No, usually chat starts with model greeting.
-      // For Zion, we want his First Message to be the reading.
-
-      // We'll set an initial history with a "Thinking..." state maybe?
-      // Or just trigger a generation call right here.
-
       initializeZionChat(pendingCharacterId, card);
       setPendingCharacterId(null);
     }
@@ -170,7 +167,8 @@ export default function Home() {
 
   const handleSendMessage = async (text: string) => {
     if (!apiKey) {
-      alert('API 키가 설정되지 않았습니다. .env.local 파일을 확인해주세요.');
+      setAlertMessage('API 키가 설정되지 않았습니다. .env.local 파일을 확인해주세요.');
+      openAlertModal();
       return;
     }
 
@@ -199,30 +197,39 @@ export default function Home() {
   };
 
   const handleReset = () => {
-    if (confirm("정말로 모든 데이터를 삭제하고 처음으로 돌아가시겠습니까?")) {
-      localStorage.removeItem('cosmic_user');
-      localStorage.removeItem('cosmic_history');
-      localStorage.removeItem('cosmic_character');
-      setUserData(null);
-      setSaju(null);
-      setHistory([]);
-      setCharacterId(null);
-      setSelectedCard(null);
-      closeSettings();
-    }
+    setConfirmConfig({
+      title: '데이터 초기화',
+      message: '정말로 모든 데이터를 삭제하고 처음으로 돌아가시겠습니까?',
+      action: () => {
+        localStorage.removeItem('cosmic_user');
+        localStorage.removeItem('cosmic_history');
+        localStorage.removeItem('cosmic_character');
+        setUserData(null);
+        setSaju(null);
+        setHistory([]);
+        setCharacterId(null);
+        setSelectedCard(null);
+        closeSettings();
+        closeConfirmModal();
+      }
+    });
+    openConfirmModal();
   };
 
-  const handleChangeCharacter = () => {
-    if (confirm("대화 상대를 변경하시겠습니까?")) {
-      if (confirm("기존 대화 내용을 지우고 새로 시작하시겠습니까? (취소 시 대화 유지)")) {
-        setHistory([]);
-        localStorage.removeItem('cosmic_history');
-        setSelectedCard(null);
-      }
-      setCharacterId(null);
-      localStorage.removeItem('cosmic_character');
+  const handleChangeCharacterRequest = () => {
+    openChangeCharModal();
+  };
+
+  const confirmChangeCharacter = () => {
+    if (clearHistoryOnSwitch) {
+      setHistory([]);
+      localStorage.removeItem('cosmic_history');
+      setSelectedCard(null);
     }
-  }
+    setCharacterId(null);
+    localStorage.removeItem('cosmic_character');
+    closeChangeCharModal();
+  };
 
   if (!isInitialized) return null;
 
@@ -235,8 +242,55 @@ export default function Home() {
     );
   }
 
+  // Dashboard Content Reuse
+  const DashboardContent = (
+    <>
+      <Text size="xl" fw={700} c="gold" mb="md">{characterId === 'zion' ? "당신의 타로 카드" : "당신의 운명 원국"}</Text>
+      {characterId === 'cheongsan' && (saju ? <SajuDashboard data={saju} /> : <Box p="md">사주 정보가 없습니다.</Box>)}
+      {characterId === 'zion' && (selectedCard ? (
+        <Box p="md" ta="center">
+          <img src={selectedCard.image} alt={selectedCard.name} style={{ width: '100%', borderRadius: '12px', marginBottom: '20px' }} />
+          <Text size="xl" fw={700} c="gold">{selectedCard.name}</Text>
+          <Text size="sm" mt="md">{selectedCard.meaning.split('/')[1]}</Text>
+        </Box>
+      ) : <Box p="md">선택된 카드가 없습니다.</Box>)}
+    </>
+  );
+
   return (
     <Box mih="100vh" style={{ position: 'relative' }}>
+      {/* Global Modals */}
+      <Modal opened={alertModalOpened} onClose={closeAlertModal} title="알림" centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
+        <Text mb="lg">{alertMessage}</Text>
+        <Group justify="flex-end">
+          <ActionIcon size="xl" color="gold" variant="filled" onClick={closeAlertModal}>확인</ActionIcon>
+        </Group>
+      </Modal>
+
+      <Modal opened={confirmModalOpened} onClose={closeConfirmModal} title={confirmConfig.title} centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
+        <Text mb="lg">{confirmConfig.message}</Text>
+        <Group justify="flex-end">
+          <ActionIcon color="gray" size="xl" variant="subtle" onClick={closeConfirmModal}>취소</ActionIcon>
+          <ActionIcon color="red" size="xl" variant="filled" onClick={confirmConfig.action}>확인</ActionIcon>
+        </Group>
+      </Modal>
+
+      <Modal opened={changeCharModalOpened} onClose={closeChangeCharModal} title="대화 상대 변경" centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
+        <Stack gap="md">
+          <Text>대화 상대를 변경하시겠습니까?</Text>
+          <Box>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={clearHistoryOnSwitch} onChange={(e) => setClearHistoryOnSwitch(e.target.checked)} />
+              <Text size="sm">기존 대화 내용 지우기</Text>
+            </label>
+          </Box>
+          <Group justify="flex-end" mt="md">
+            <ActionIcon color="gray" size="xl" variant="subtle" onClick={closeChangeCharModal}>취소</ActionIcon>
+            <ActionIcon color="gold" size="xl" variant="filled" onClick={confirmChangeCharacter}>변경</ActionIcon>
+          </Group>
+        </Stack>
+      </Modal>
+
       {!userData ? (
         <Onboarding onComplete={handleOnboardingComplete} />
       ) : !characterId ? (
@@ -250,36 +304,33 @@ export default function Home() {
             onOpenSettings={openSettings}
             isTyping={isTyping}
             characterId={characterId}
-            onChangeCharacter={handleChangeCharacter}
+            onChangeCharacter={handleChangeCharacterRequest}
+            dashboard={DashboardContent}
           />
 
-          <ActionIcon
-            variant="filled"
-            color="indigo"
-            size="xl"
-            onClick={toggleDashboard}
-            style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, borderRadius: '50%' }}
-          >
-            <IconLayoutDashboard size={24} />
-          </ActionIcon>
+          {/* Mobile Only Dashboard Button and Drawer */}
+          <Box hiddenFrom="sm">
+            <ActionIcon
+              variant="filled"
+              color="indigo"
+              size="xl"
+              onClick={toggleDashboard}
+              style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, borderRadius: '50%' }}
+            >
+              <IconLayoutDashboard size={24} />
+            </ActionIcon>
 
-          <Drawer
-            opened={dashboardOpened}
-            onClose={toggleDashboard}
-            title={characterId === 'zion' ? "당신의 타로 카드" : "당신의 운명 원국"}
-            position="left"
-            size="md"
-            styles={{ content: { background: 'var(--background)', color: 'white' } }}
-          >
-            {characterId === 'cheongsan' && (saju ? <SajuDashboard data={saju} /> : <Box p="md">사주 정보가 없습니다.</Box>)}
-            {characterId === 'zion' && (selectedCard ? (
-              <Box p="md" ta="center">
-                <img src={selectedCard.image} alt={selectedCard.name} style={{ width: '100%', borderRadius: '12px', marginBottom: '20px' }} />
-                <Text size="xl" fw={700} c="gold">{selectedCard.name}</Text>
-                <Text size="sm" mt="md">{selectedCard.meaning.split('/')[1]}</Text>
-              </Box>
-            ) : <Box p="md">선택된 카드가 없습니다.</Box>)}
-          </Drawer>
+            <Drawer
+              opened={dashboardOpened}
+              onClose={toggleDashboard}
+              title={characterId === 'zion' ? "당신의 타로 카드" : "당신의 운명 원국"}
+              position="left"
+              size="md"
+              styles={{ content: { background: 'var(--background)', color: 'white' } }}
+            >
+              {DashboardContent}
+            </Drawer>
+          </Box>
 
           <SettingsModal
             opened={settingsOpened}

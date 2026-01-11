@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Box, Paper, Text, Stack, Group, ActionIcon, ScrollArea, Tooltip, Divider } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconSettings, IconSend, IconUsers } from '@tabler/icons-react';
+import { IconSettings, IconSend, IconUsers, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { CHARACTERS } from '@/lib/characters';
 
 interface Message {
@@ -20,6 +20,7 @@ interface VisualNovelProps {
     isTyping: boolean;
     characterId: string;
     onChangeCharacter: () => void;
+    dashboard?: React.ReactNode;
 }
 
 export default function VisualNovel({
@@ -29,7 +30,8 @@ export default function VisualNovel({
     onOpenSettings,
     isTyping,
     characterId,
-    onChangeCharacter
+    onChangeCharacter,
+    dashboard
 }: VisualNovelProps) {
     const [inputText, setInputText] = useState('');
     const lastMessage = history[history.length - 1];
@@ -39,7 +41,7 @@ export default function VisualNovel({
     // Format text with line breaks
     const formatText = (text: string) => {
         return text
-            .replace(/([.!?。!?])\s*/g, '$1\n')
+            .replace(/(\.{3}|[.!?。!?])\s*/g, '$1\n')
             .replace(/\n{3,}/g, '\n\n');
     };
 
@@ -111,51 +113,45 @@ export default function VisualNovel({
                 </Tooltip>
             </Group>
 
-            {/* Main Layout: Desktop - Split, Mobile - Full Screen with Overlay */}
+            {/* Main Layout: Desktop - 3 Columns, Mobile - Full Screen with Overlay */}
             <Box className="main-layout">
-                {/* Left Side - Character Image with Frame (Desktop) / Full Screen (Mobile) */}
+                {/* Left Side - Dashboard (Desktop Only) */}
+                <Box className="dashboard-panel desktop-only">
+                    {dashboard}
+                </Box>
+                {/* Center - Character Image & Viewport Overlay */}
                 <Box className="character-panel">
-                    <motion.div
-                        key={characterId}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.5 }}
-                        className="character-frame"
-                    >
-                        {/* Ornamental Frame (Desktop Only) */}
-                        <Box className="frame-border">
-                            <Box
-                                className="frame-inner"
-                                style={{
-                                    aspectRatio: imageAspectRatio ? `${imageAspectRatio}` : 'auto'
-                                }}
-                            >
-                                <AnimatePresence mode="wait">
-                                    <motion.img
-                                        key={imagePath}
-                                        src={imagePath}
-                                        alt={character.name}
-                                        initial={{ opacity: 0.8, scale: 1.02 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0.8 }}
-                                        transition={{ duration: 0.3 }}
-                                        className="character-portrait"
-                                        onLoad={handleImageLoad}
-                                    />
-                                </AnimatePresence>
-                            </Box>
-                        </Box>
+                    {/* Character & Viewport Overlay */}
+                    <Box className="viewport-overlay">
+                        <Box className="viewport-hole">
+                            <AnimatePresence mode="wait">
+                                <motion.img
+                                    key={imagePath}
+                                    src={imagePath}
+                                    alt={character.name}
+                                    initial={{ opacity: 0, scale: 1.1 }}
+                                    animate={{ opacity: 1, scale: 1.02 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.5 }}
+                                    className="character-portrait"
+                                    onLoad={handleImageLoad}
+                                />
+                            </AnimatePresence>
 
-                        {/* Character Name Plate (Desktop Only) */}
-                        <Box className="name-plate" style={{ borderColor: character.color }}>
-                            <Text c="white" size="lg" fw={700} ta="center">
-                                {character.name}
-                            </Text>
-                            <Text c="gray.4" size="xs" ta="center">
-                                {character.title}
-                            </Text>
+                            {/* Decorative Border for the hole */}
+                            <Box className="hole-border" />
                         </Box>
-                    </motion.div>
+                    </Box>
+
+                    {/* Character Name (Overlay on top of everything) */}
+                    <Box className="name-plate-overlay">
+                        <Text c="white" size="lg" fw={700} ta="center" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                            {character.name}
+                        </Text>
+                        <Text c="gold" size="xs" ta="center" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                            {character.title}
+                        </Text>
+                    </Box>
                 </Box>
 
                 {/* Right Side - Chat Log (Desktop) */}
@@ -267,6 +263,7 @@ function MobileChatOverlay({
     formatText
 }: any) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [isMinimized, setIsMinimized] = useState(false); // New state to hide chat completely
     const [startY, setStartY] = useState(0);
     const [currentY, setCurrentY] = useState(0);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -290,144 +287,182 @@ function MobileChatOverlay({
     const handleTouchEnd = () => {
         const diff = startY - currentY;
         if (Math.abs(diff) > 50) {
-            if (diff > 0 && !isExpanded) {
-                setIsExpanded(true);
-            } else if (diff < 0 && isExpanded) {
-                setIsExpanded(false);
+            if (diff > 0 && !isExpanded && !isMinimized) {
+                setIsExpanded(true); // Swipe Up -> Expand
+            } else if (diff < 0) {
+                if (isExpanded) {
+                    setIsExpanded(false); // Swipe Down (from expanded) -> Collapse
+                } else {
+                    // Swipe Down (from collapsed) -> Minimize? Maybe just button for now to be safe
+                }
             }
         }
         setStartY(0);
         setCurrentY(0);
     };
 
+    const toggleMinimize = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsMinimized(!isMinimized);
+        if (isMinimized) {
+            // Restoring
+            // keep isExpanded as is?
+        } else {
+            // Minimizing
+            setIsExpanded(false); // Collapse if expanded
+        }
+    };
+
     return (
-        <Box className="mobile-chat-overlay">
+        <Box className="mobile-chat-overlay" style={{ pointerEvents: 'none' }}> {/* Container passes clicks */}
             <motion.div
                 className={`mobile-chat-container ${isExpanded ? 'expanded' : ''}`}
                 initial={{ y: 0 }}
-                animate={{ y: isExpanded ? 0 : 0 }}
+                animate={{
+                    y: isMinimized ? 'calc(100% - 48px)' : (isExpanded ? 0 : 0)
+                    // If minimized, push down leaving only header. If expanded/collapsed, handled by CSS height usually, or we can animate height here
+                    // Actually existing CSS handles height for expanded class.
+                }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                style={{ pointerEvents: 'auto' }}
             >
-                {/* Drag Handle */}
+                {/* Drag Handle & Toggle */}
                 <Box
                     className="drag-handle"
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
-                    onClick={() => setIsExpanded(!isExpanded)}
+                    onClick={() => !isMinimized && setIsExpanded(!isExpanded)}
+                    style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
                 >
                     <Box className="drag-indicator" />
-                    {!isExpanded && (
-                        <Text size="xs" c="dimmed" ta="center" mt={4}>
-                            위로 스와이프하여 전체 대화 보기
+
+                    {/* Minimize/Restore Button */}
+                    <ActionIcon
+                        variant="transparent"
+                        color="gray"
+                        size="sm"
+                        style={{ position: 'absolute', right: 10 }}
+                        onClick={toggleMinimize}
+                    >
+                        {isMinimized ? <IconChevronUp /> : <IconChevronDown />}
+                    </ActionIcon>
+
+                    {!isExpanded && !isMinimized && (
+                        <Text size="xs" c="dimmed" ta="center" mt={4} style={{ display: 'none' }}>
+                            {/* Hiding text to clean up UI */}
                         </Text>
                     )}
                 </Box>
 
-                {/* Chat Content */}
-                {isExpanded ? (
-                    // Full Chat History
-                    <ScrollArea className="mobile-full-chat" viewportRef={scrollRef}>
-                        <Stack gap="md" p="md">
-                            <Group justify="space-between" mb="sm">
-                                <Text size="lg" fw={700} c={character.color}>
-                                    대화 기록
-                                </Text>
-                                <Text size="xs" c="dimmed">
-                                    {history.length}개
-                                </Text>
-                            </Group>
-                            {history.map((msg: any, idx: number) => (
-                                <Box
-                                    key={idx}
-                                    className={msg.role === 'user' ? 'message-user' : 'message-model'}
-                                >
-                                    <Text size="xs" c="dimmed" mb={4}>
-                                        {msg.role === 'model' ? character.name : userName}
-                                    </Text>
-                                    <Paper
-                                        p="sm"
-                                        className={msg.role === 'user' ? 'message-bubble-user' : 'message-bubble-model'}
-                                        style={{
-                                            backgroundColor: msg.role === 'user'
-                                                ? 'rgba(99, 102, 241, 0.3)'
-                                                : `rgba(${parseInt(character.color.slice(1, 3), 16)}, ${parseInt(character.color.slice(3, 5), 16)}, ${parseInt(character.color.slice(5, 7), 16)}, 0.25)`,
-                                            borderLeft: `3px solid ${msg.role === 'user' ? '#6366f1' : character.color}`
-                                        }}
-                                    >
-                                        <Text
-                                            size="sm"
+                {/* Chat Content - Hidden if minimized */}
+                {!isMinimized && (
+                    <>
+                        {isExpanded ? (
+                            // Full Chat History
+                            <ScrollArea className="mobile-full-chat" viewportRef={scrollRef}>
+                                <Stack gap="md" p="md">
+                                    <Group justify="space-between" mb="sm">
+                                        <Text size="lg" fw={700} c={character.color}>
+                                            대화 기록
+                                        </Text>
+                                        <Text size="xs" c="dimmed">
+                                            {history.length}개
+                                        </Text>
+                                    </Group>
+                                    {history.map((msg: any, idx: number) => (
+                                        <Box
+                                            key={idx}
+                                            className={msg.role === 'user' ? 'message-user' : 'message-model'}
+                                        >
+                                            <Text size="xs" c="dimmed" mb={4}>
+                                                {msg.role === 'model' ? character.name : userName}
+                                            </Text>
+                                            <Paper
+                                                p="sm"
+                                                className={msg.role === 'user' ? 'message-bubble-user' : 'message-bubble-model'}
+                                                style={{
+                                                    backgroundColor: msg.role === 'user'
+                                                        ? 'rgba(99, 102, 241, 0.3)'
+                                                        : `rgba(${parseInt(character.color.slice(1, 3), 16)}, ${parseInt(character.color.slice(3, 5), 16)}, ${parseInt(character.color.slice(5, 7), 16)}, 0.25)`,
+                                                    borderLeft: `3px solid ${msg.role === 'user' ? '#6366f1' : character.color}`
+                                                }}
+                                            >
+                                                <Text
+                                                    size="sm"
+                                                    style={{
+                                                        whiteSpace: 'pre-line',
+                                                        lineHeight: 1.7
+                                                    }}
+                                                >
+                                                    {formatText(msg.text)}
+                                                </Text>
+                                            </Paper>
+                                        </Box>
+                                    ))}
+                                </Stack>
+                            </ScrollArea>
+                        ) : (
+                            // Latest Message Only
+                            <Box className="mobile-latest-message" p="md">
+                                {lastMessage && (
+                                    <Box className={lastMessage.role === 'user' ? 'message-user' : 'message-model'}>
+                                        <Text size="xs" c="dimmed" mb={4}>
+                                            {lastMessage.role === 'model' ? character.name : userName}
+                                        </Text>
+                                        <Paper
+                                            p="sm"
+                                            className={lastMessage.role === 'user' ? 'message-bubble-user' : 'message-bubble-model'}
                                             style={{
-                                                whiteSpace: 'pre-line',
-                                                lineHeight: 1.7
+                                                backgroundColor: lastMessage.role === 'user'
+                                                    ? 'rgba(99, 102, 241, 0.3)'
+                                                    : `rgba(${parseInt(character.color.slice(1, 3), 16)}, ${parseInt(character.color.slice(3, 5), 16)}, ${parseInt(character.color.slice(5, 7), 16)}, 0.25)`,
+                                                borderLeft: `3px solid ${lastMessage.role === 'user' ? '#6366f1' : character.color}`
                                             }}
                                         >
-                                            {formatText(msg.text)}
-                                        </Text>
-                                    </Paper>
-                                </Box>
-                            ))}
-                        </Stack>
-                    </ScrollArea>
-                ) : (
-                    // Latest Message Only
-                    <Box className="mobile-latest-message" p="md">
-                        {lastMessage && (
-                            <Box className={lastMessage.role === 'user' ? 'message-user' : 'message-model'}>
-                                <Text size="xs" c="dimmed" mb={4}>
-                                    {lastMessage.role === 'model' ? character.name : userName}
-                                </Text>
-                                <Paper
-                                    p="sm"
-                                    className={lastMessage.role === 'user' ? 'message-bubble-user' : 'message-bubble-model'}
-                                    style={{
-                                        backgroundColor: lastMessage.role === 'user'
-                                            ? 'rgba(99, 102, 241, 0.3)'
-                                            : `rgba(${parseInt(character.color.slice(1, 3), 16)}, ${parseInt(character.color.slice(3, 5), 16)}, ${parseInt(character.color.slice(5, 7), 16)}, 0.25)`,
-                                        borderLeft: `3px solid ${lastMessage.role === 'user' ? '#6366f1' : character.color}`
-                                    }}
-                                >
-                                    <Text
-                                        size="sm"
-                                        style={{
-                                            whiteSpace: 'pre-line',
-                                            lineHeight: 1.7
-                                        }}
-                                    >
-                                        {formatText(lastMessage.text)}
-                                        {isTyping && <span className="fade-in">...</span>}
-                                    </Text>
-                                </Paper>
+                                            <Text
+                                                size="sm"
+                                                style={{
+                                                    whiteSpace: 'pre-line',
+                                                    lineHeight: 1.7
+                                                }}
+                                            >
+                                                {formatText(lastMessage.text)}
+                                                {isTyping && <span className="fade-in">...</span>}
+                                            </Text>
+                                        </Paper>
+                                    </Box>
+                                )}
                             </Box>
                         )}
-                    </Box>
-                )}
 
-                {/* Input Area */}
-                <Box className="mobile-input-area" style={{ borderTopColor: `${character.color}40` }}>
-                    <Group gap="xs">
-                        <input
-                            value={inputText}
-                            onChange={(e) => setInputText(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                            placeholder={`${character.name}에게 말을 걸어보세요...`}
-                            className="chat-input"
-                            style={{
-                                borderBottomColor: `${character.color}80`
-                            }}
-                            disabled={isTyping}
-                        />
-                        <ActionIcon
-                            variant="filled"
-                            color={character.color}
-                            onClick={handleSend}
-                            disabled={isTyping || !inputText.trim()}
-                            size="lg"
-                        >
-                            <IconSend size={18} />
-                        </ActionIcon>
-                    </Group>
-                </Box>
+                        {/* Input Area */}
+                        <Box className="mobile-input-area" style={{ borderTopColor: `${character.color}40` }}>
+                            <Group gap="xs">
+                                <input
+                                    value={inputText}
+                                    onChange={(e) => setInputText(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                    placeholder={`${character.name}에게 말을 걸어보세요...`}
+                                    className="chat-input"
+                                    style={{
+                                        borderBottomColor: `${character.color}80`
+                                    }}
+                                    disabled={isTyping}
+                                />
+                                <ActionIcon
+                                    variant="filled"
+                                    color={character.color}
+                                    onClick={handleSend}
+                                    disabled={isTyping || !inputText.trim()}
+                                    size="lg"
+                                >
+                                    <IconSend size={18} />
+                                </ActionIcon>
+                            </Group>
+                        </Box>
+                    </>
+                )}
             </motion.div>
         </Box>
     );

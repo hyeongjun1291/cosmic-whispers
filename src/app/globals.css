@@ -269,105 +269,137 @@ body {
 
 /* ===== NEW VISUAL NOVEL LAYOUT ===== */
 
-/* Main Layout - Desktop Split Screen */
+/* Main Layout - Desktop */
 .main-layout {
   display: flex;
   height: 100vh;
   width: 100vw;
   position: relative;
   z-index: 2;
+  gap: 0;
+  /* No gaps */
+  background: transparent;
+  /* Allow global starfield to show */
 }
 
-/* Character Panel - Left Side */
-.character-panel {
-  flex: 0 0 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  position: relative;
-  overflow: hidden;
-}
-
-.character-frame {
-  width: 100%;
-  height: 100%;
+/* Dashboard Panel - Left Side */
+.dashboard-panel {
+  flex: 1 0 400px;
+  /* Grow to fill space, Min 400px */
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Frame */
-.frame-border {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.frame-inner {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: visible;
-}
-
-.character-portrait {
-  width: auto;
-  height: 100vh;
-  display: block;
-  object-fit: cover;
-  object-position: center;
-
-  /* Fade out edges for natural blending */
-  mask-image: linear-gradient(to right,
-      transparent 0%,
-      black 5%,
-      black 95%,
-      transparent 100%),
-    linear-gradient(to bottom,
-      transparent 0%,
-      black 5%,
-      black 95%,
-      transparent 100%);
-  mask-composite: intersect;
-  -webkit-mask-image: linear-gradient(to right,
-      transparent 0%,
-      black 5%,
-      black 95%,
-      transparent 100%),
-    linear-gradient(to bottom,
-      transparent 0%,
-      black 5%,
-      black 95%,
-      transparent 100%);
-  -webkit-mask-composite: source-in;
-}
-
-/* Name Plate */
-.name-plate {
-  background: rgba(30, 35, 50, 0.9);
+  padding: 20px;
+  background: rgba(5, 5, 5, 0.7);
+  /* Semi-transparent */
   backdrop-filter: blur(10px);
-  border: 2px solid;
-  border-radius: 12px;
-  padding: 12px 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  /* Glass effect over stars */
+  border-right: 1px solid rgba(255, 215, 0, 0.1);
+  z-index: 2;
+  position: relative;
 }
 
 /* Chat Panel - Right Side */
 .chat-panel {
-  flex: 0 0 50%;
+  flex: 1 0 450px;
+  /* Grow to fill space, Min 450px */
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
   padding: 20px;
-  padding-left: 10px;
+  background: rgba(5, 5, 5, 0.7);
+  /* Semi-transparent */
+  backdrop-filter: blur(10px);
+  /* Glass effect over stars */
+  border-left: 1px solid rgba(255, 215, 0, 0.1);
+  z-index: 2;
+  position: relative;
 }
+
+/* Character Panel - Center */
+.character-panel {
+  flex: 0 0 65vh;
+  /* Fixed Aspect Ratio Slot (approx 0.65) to match image */
+  max-width: 100%;
+  /* Safety */
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  /* Show stars behind character */
+  margin: 0;
+  padding: 0;
+  /* Strict zero padding */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* 1. Character Image - Inside Hole */
+.character-portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Fill the area strictly ("tightly squeezed") */
+  object-position: center;
+  display: block;
+}
+
+/* 2. Viewport Overlay - The "Wall" with a Hole */
+.viewport-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  /* Allow clicking through if needed */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewport-hole {
+  /* Dimensions of the "Hole" - Fill the area */
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  /* No corners */
+  position: relative;
+  display: flex;
+  /* Removes bottom gap for images */
+
+  /* Removed Wall Shadow - Transparent Background */
+  background: transparent;
+  overflow: hidden;
+}
+
+/* Add a blur to the "Wall" area? CSS can't easier box-shadow blur only outside.
+   So let's just make it a cool focused look. */
+
+/* Decorative Border for the Hole is removed */
+.hole-border {
+  display: none;
+}
+
+/* Name Plate Overlay */
+.name-plate-overlay {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  backdrop-filter: blur(4px);
+}
+
+/* Chat Panel - Right Side */
+/* This block is now defined above for desktop layout */
+
 
 .desktop-only {
   display: flex;
@@ -457,9 +489,12 @@ body {
 }
 
 /* Mobile Layout */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .main-layout {
     flex-direction: column;
+    width: 100vw;
+    height: 100dvh;
+    /* Dynamic viewport height for mobile */
   }
 
   /* Desktop chat panel hidden on mobile */
@@ -467,76 +502,33 @@ body {
     display: none !important;
   }
 
-  /* Character panel becomes full screen */
+  /* Character panel becomes full screen background on mobile */
   .character-panel {
-    flex: 1;
-    padding: 0;
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
+    margin: 0;
+    /* Reset desktop margins */
+    z-index: 0;
   }
 
-  .character-frame {
-    max-width: none;
-    width: 100%;
-    height: 100%;
-    gap: 0;
-  }
-
-  .frame-border {
-    padding: 0;
-    background: none;
-    border: none;
-    box-shadow: none;
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-  }
-
-  .frame-inner {
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-    background: none;
-    box-shadow: none;
-    overflow: visible;
-  }
-
+  /* On mobile, cover is better to fill the screen background behind overlays */
   .character-portrait {
-    width: 100%;
-    height: 100vh;
     object-fit: cover;
-    object-position: center;
-
-    /* Fade out edges */
-    mask-image: linear-gradient(to right,
-        transparent 0%,
-        black 3%,
-        black 97%,
-        transparent 100%),
-      linear-gradient(to bottom,
-        transparent 0%,
-        black 3%,
-        black 97%,
-        transparent 100%);
-    mask-composite: intersect;
-    -webkit-mask-image: linear-gradient(to right,
-        transparent 0%,
-        black 3%,
-        black 97%,
-        transparent 100%),
-      linear-gradient(to bottom,
-        transparent 0%,
-        black 3%,
-        black 97%,
-        transparent 100%);
-    -webkit-mask-composite: source-in;
+    object-position: center top;
   }
 
-  .name-plate {
-    display: none;
+  /* Mobile Viewport */
+  .viewport-hole {
+    max-width: 100%;
+    max-height: 100%;
+    top: 0;
+    border-radius: 0;
+    /* Full screen usually implies no corners or smaller ones? keeping 0 makes it truly full */
+  }
+
+  .name-plate-overlay {
+    bottom: 20%;
+    /* Adjust for mobile chat */
   }
 
   /* Mobile chat overlay - shown on mobile */
@@ -552,8 +544,8 @@ body {
 
   .mobile-chat-container {
     pointer-events: all;
-    background: rgba(20, 25, 40, 0.5);
-    backdrop-filter: blur(20px);
+    background: rgba(20, 25, 40, 0.2);
+    backdrop-filter: blur(10px);
     border-top-left-radius: 24px;
     border-top-right-radius: 24px;
     box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5);
