@@ -546,6 +546,93 @@ export default function Home() {
                   size="md"
                   styles={{ content: { background: 'var(--background)', color: 'white' } }}
                 >
+                  {/* Character Navigation - Mobile Dashboard */}
+                  <Box mb="lg" pb="md" style={{ borderBottom: '1px solid rgba(255, 215, 0, 0.2)' }}>
+                    <Text size="sm" c="dimmed" mb="sm">대화 상대 선택</Text>
+                    <Stack gap="sm">
+                      {Object.values(CHARACTERS).map((char) => {
+                        const affection = affectionScores[char.id] || 30;
+                        return (
+                          <Box
+                            key={char.id}
+                            onClick={() => {
+                              handleCharacterSelect(char.id);
+                              toggleDashboard();
+                            }}
+                            style={{
+                              cursor: 'pointer',
+                              background: characterId === char.id
+                                ? 'rgba(255, 215, 0, 0.15)'
+                                : 'rgba(255, 255, 255, 0.03)',
+                              borderRadius: '8px',
+                              border: characterId === char.id
+                                ? '1px solid rgba(255, 215, 0, 0.5)'
+                                : '1px solid rgba(255, 255, 255, 0.05)',
+                              transition: 'all 0.2s ease',
+                              padding: '12px'
+                            }}
+                          >
+                            <Group gap="md" wrap="nowrap">
+                              <Box
+                                style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  borderRadius: '50%',
+                                  overflow: 'hidden',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <img
+                                  src={`/images/ui/nav_${char.id}.png`}
+                                  alt={char.name}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={(e) => {
+                                    e.currentTarget.src = `/images/characters/${char.imageNumber}_default.jpg`;
+                                  }}
+                                />
+                              </Box>
+                              <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+                                <Text size="sm" fw={characterId === char.id ? 700 : 500} c={characterId === char.id ? 'gold' : 'white'}>
+                                  {char.name}
+                                </Text>
+                                <Text size="xs" c="dimmed" truncate>{char.title}</Text>
+                              </Stack>
+                              <Stack gap={4} align="flex-end" style={{ flexShrink: 0 }}>
+                                <Group gap={4}>
+                                  <Text size="xs" c="pink" fw={500}>
+                                    {affection}%
+                                  </Text>
+                                </Group>
+                                <Box
+                                  style={{
+                                    width: '50px',
+                                    height: '3px',
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '2px',
+                                    overflow: 'hidden'
+                                  }}
+                                >
+                                  <Box
+                                    style={{
+                                      width: `${affection}%`,
+                                      height: '100%',
+                                      background: affection >= 70
+                                        ? 'linear-gradient(90deg, #ff6b6b, #ff8787)'
+                                        : affection >= 40
+                                          ? 'linear-gradient(90deg, #ffa8a8, #ffb3b3)'
+                                          : 'linear-gradient(90deg, #868e96, #adb5bd)',
+                                      transition: 'width 0.3s ease'
+                                    }}
+                                  />
+                                </Box>
+                              </Stack>
+                            </Group>
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  </Box>
+
                   {DashboardContent}
                 </Drawer>
               </Box>
