@@ -4,11 +4,11 @@ import { SimpleGrid, Card, Text, Group, Badge, Button, Stack, Image, Box, Action
 import { CHARACTERS } from '@/lib/characters';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
+import { IconBrandInstagram, IconBrandX } from '@tabler/icons-react';
 
 interface CharacterSelectionProps {
     onSelect: (characterId: string) => void;
 }
-
 
 export default function CharacterSelection({ onSelect }: CharacterSelectionProps) {
     const chars = Object.values(CHARACTERS);
@@ -212,7 +212,7 @@ export default function CharacterSelection({ onSelect }: CharacterSelectionProps
                     <Group gap="lg" mt="sm">
                         {/* Instagram */}
                         <a
-                            href="https://instagram.com"
+                            href={process.env.NEXT_PUBLIC_INSTAGRAM_HYPERLINK || "https://instagram.com"}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
@@ -238,16 +238,14 @@ export default function CharacterSelection({ onSelect }: CharacterSelectionProps
                                     boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
                                 }}
                             >
-                                <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
-                                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-                                </svg>
+                                <IconBrandInstagram size={30} color="white" stroke={1.5} />
                             </Box>
                             <Text size="xs" c="dimmed" mt={4}>Instagram</Text>
                         </a>
 
                         {/* X (Twitter) */}
                         <a
-                            href="https://x.com"
+                            href={process.env.NEXT_PUBLIC_X_HYPERLINK || "https://x.com"}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
@@ -273,47 +271,12 @@ export default function CharacterSelection({ onSelect }: CharacterSelectionProps
                                     boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
                                 }}
                             >
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                                </svg>
+                                <IconBrandX size={28} color="white" stroke={1.5} />
                             </Box>
                             <Text size="xs" c="dimmed" mt={4}>X</Text>
                         </a>
 
-                        {/* Threads */}
-                        <a
-                            href="https://threads.net"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textDecoration: 'none',
-                                transition: 'transform 0.2s ease',
-                                cursor: 'pointer'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                        >
-                            <Box
-                                style={{
-                                    width: '50px',
-                                    height: '50px',
-                                    borderRadius: '12px',
-                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                                }}
-                            >
-                                <svg width="24" height="24" viewBox="0 0 192 192" fill="white">
-                                    <path d="M141.537 88.988a66.667 66.667 0 0 0-2.518-1.143c-1.482-27.307-16.403-42.94-41.457-43.1h-.34c-14.986 0-27.449 6.396-35.12 18.036l13.779 9.452c5.73-8.695 14.538-10.552 21.748-10.552h.24c6.606.016 12.082 2.068 16.262 6.1 3.755 3.617 6.193 8.682 7.253 15.06a119.814 119.814 0 0 0-15.366-1.014c-16.067 0-30.622 3.64-39.887 9.996-9.925 6.809-15.6 17.153-15.6 28.408 0 11.115 4.553 20.964 12.824 27.734 7.996 6.543 18.737 10.114 30.25 10.114 12.782 0 23.725-4.39 31.633-12.694 6.324-6.642 10.93-15.982 13.288-26.97 3.42 2.177 6.382 4.813 8.73 7.776 6.34 8.003 9.521 18.006 9.521 29.92 0 11.355-3.014 20.839-8.944 28.164-6.064 7.49-14.98 11.82-24.45 11.882h-.344c-9.553 0-18.516-4.448-24.578-12.207l-13.711 9.606c8.44 10.879 21.031 17.126 34.539 17.126h.34c14.358-.07 27.486-6.914 36.953-19.265 9.17-11.97 13.848-27.652 13.848-46.603 0-16.923-4.455-31.417-13.239-43.1-3.917-5.21-8.822-9.653-14.506-13.148z" />
-                                </svg>
-                            </Box>
-                            <Text size="xs" c="dimmed" mt={4}>Threads</Text>
-                        </a>
+
                     </Group>
                 </Stack>
             </Box>
