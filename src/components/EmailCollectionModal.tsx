@@ -16,17 +16,28 @@ export default function EmailCollectionModal({ opened, onClose }: EmailCollectio
     const handleSubmit = async () => {
         if (!email.includes('@')) return; // Basic validation
 
-        console.log(`[Email Collection] New Subscriber: ${email}`);
+        try {
+            // Call API to save email
+            const response = await fetch('/api/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
 
-        // In a real app, API call here
-        // await fetch('/api/subscribe', { method: 'POST', body: JSON.stringify({ email }) });
+            if (!response.ok) {
+                console.error('Failed to save email');
+                return;
+            }
 
-        setSubmitted(true);
-        setTimeout(() => {
-            setSubmitted(false);
-            setEmail('');
-            onClose();
-        }, 2000);
+            setSubmitted(true);
+            setTimeout(() => {
+                setSubmitted(false);
+                setEmail('');
+                onClose();
+            }, 2000);
+        } catch (error) {
+            console.error('Email submission error:', error);
+        }
     };
 
     return (
