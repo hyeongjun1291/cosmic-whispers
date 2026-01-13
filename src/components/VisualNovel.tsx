@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Box, Paper, Text, Stack, Group, ActionIcon, ScrollArea, Tooltip, Divider } from '@mantine/core';
+import { Box, Paper, Text, Stack, Group, ActionIcon, ScrollArea, Tooltip, Divider, RingProgress } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconSettings, IconSend, IconUsers, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
+import { IconSettings, IconSend, IconUsers, IconChevronUp, IconChevronDown, IconHeartFilled } from '@tabler/icons-react';
 import { CHARACTERS } from '@/lib/characters';
 
 interface Message {
@@ -19,6 +19,7 @@ interface VisualNovelProps {
     onSwitchToCharacter: (id: string) => void;
     isTyping: boolean;
     characterId: string;
+    affectionScore: number;
     dashboard?: React.ReactNode;
 }
 
@@ -29,12 +30,37 @@ export default function VisualNovel({
     isTyping,
     characterId,
     onSwitchToCharacter,
+    affectionScore,
     dashboard
 }: VisualNovelProps) {
     const [inputText, setInputText] = useState('');
     const lastMessage = history[history.length - 1];
     const scrollRef = useRef<HTMLDivElement>(null);
     const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
+    const prevAffectionRef = useRef(affectionScore);
+    const prevCharacterIdRef = useRef(characterId);
+    const [affectionDelta, setAffectionDelta] = useState<{ id: number; value: number } | null>(null);
+
+    // Track affection changes for visual feedback
+    useEffect(() => {
+        // If character changed, reset baselines without showing delta
+        if (characterId !== prevCharacterIdRef.current) {
+            prevAffectionRef.current = affectionScore;
+            prevCharacterIdRef.current = characterId;
+            setAffectionDelta(null);
+            return;
+        }
+
+        const delta = affectionScore - prevAffectionRef.current;
+        if (delta !== 0) {
+            setAffectionDelta({ id: Date.now(), value: delta });
+            prevAffectionRef.current = affectionScore;
+
+            // Clear delta after animation
+            const timer = setTimeout(() => setAffectionDelta(null), 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [affectionScore, characterId]);
 
     // Format text with line breaks
     const formatText = (text: string) => {
@@ -89,35 +115,6 @@ export default function VisualNovel({
 
             {/* Top Controls */}
             {/* Top Controls - REMOVED per request */}
-            {/* Floating Character Nav */}
-            <Box style={{ position: 'absolute', left: 20, top: '50%', transform: 'translateY(-50%)', zIndex: 50 }} visibleFrom="sm">
-                <Stack gap="md" align="center" style={{ backgroundColor: 'transparent', padding: '10px' }}>
-                    {Object.values(CHARACTERS).map((char) => (
-                        <Tooltip key={char.id} label={char.name} position="right" withArrow>
-                            <button
-                                onClick={() => onSwitchToCharacter(char.id)}
-                                className="nav-custom-btn"
-                                style={{
-                                    opacity: characterId === char.id ? 1 : 0.6,
-                                    filter: characterId === char.id ? 'drop-shadow(0 0 5px gold)' : 'grayscale(0.5)'
-                                }}
-                            >
-                                <img
-                                    src={`/images/ui/nav_${char.id}.png`}
-                                    alt={char.name}
-                                    onError={(e) => {
-                                        // Fallback to old avatar if custom asset missing (Temporary dev aid)
-                                        e.currentTarget.src = `/images/characters/${char.imageNumber}_default.jpg`;
-                                        e.currentTarget.style.objectFit = 'cover';
-                                        e.currentTarget.style.borderRadius = '50%';
-                                    }}
-                                />
-                            </button>
-                        </Tooltip>
-                    ))}
-                </Stack>
-            </Box>
-
             {/* Main Layout: Desktop - 3 Columns, Mobile - Full Screen with Overlay */}
             <Box className="main-layout">
                 {/* Left Side - Dashboard (Desktop Only) */}
@@ -126,6 +123,34 @@ export default function VisualNovel({
                 </Box>
                 {/* Center - Character Image & Viewport Overlay */}
                 <Box className="character-panel">
+                    {/* Floating Character Nav - Positioned inside Character Panel to avoid overlap with Dashboard */}
+                    <Box style={{ position: 'absolute', left: 20, top: '50%', transform: 'translateY(-50%)', zIndex: 50 }} visibleFrom="sm">
+                        <Stack gap="md" align="center" style={{ backgroundColor: 'transparent', padding: '10px' }}>
+                            {Object.values(CHARACTERS).map((char) => (
+                                <Tooltip key={char.id} label={char.name} position="right" withArrow>
+                                    <button
+                                        onClick={() => onSwitchToCharacter(char.id)}
+                                        className="nav-custom-btn"
+                                        style={{
+                                            opacity: characterId === char.id ? 1 : 0.6,
+                                            filter: characterId === char.id ? 'drop-shadow(0 0 5px gold)' : 'grayscale(0.5)'
+                                        }}
+                                    >
+                                        <img
+                                            src={`/images/ui/nav_${char.id}.png`}
+                                            alt={char.name}
+                                            onError={(e) => {
+                                                e.currentTarget.src = `/images/characters/${char.imageNumber}_default.jpg`;
+                                                e.currentTarget.style.objectFit = 'cover';
+                                                e.currentTarget.style.borderRadius = '50%';
+                                            }}
+                                        />
+                                    </button>
+                                </Tooltip>
+                            ))}
+                        </Stack>
+                    </Box>
+
                     {/* Character & Viewport Overlay */}
                     <Box className="viewport-overlay">
                         <Box className="viewport-hole">
@@ -148,7 +173,7 @@ export default function VisualNovel({
                         </Box>
                     </Box>
 
-                    {/* Character Name (Overlay on top of everything) */}
+                    {/* Name Plate */}
                     <Box className="name-plate-overlay">
                         <Text c="white" size="lg" fw={700} ta="center" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
                             {character.name}
@@ -156,6 +181,61 @@ export default function VisualNovel({
                         <Text c="gold" size="xs" ta="center" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
                             {character.title}
                         </Text>
+                    </Box>
+
+                    {/* Affection Meter - Floating Top Right of Character Panel */}
+                    <Box style={{
+                        position: 'absolute',
+                        top: 40,
+                        right: 40,
+                        zIndex: 60,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        border: '1px solid gold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        backdropFilter: 'blur(4px)'
+                    }}>
+                        <RingProgress
+                            size={40}
+                            thickness={4}
+                            roundCaps
+                            sections={[{ value: affectionScore, color: 'pink' }]}
+                            label={
+                                <Box style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <IconHeartFilled size={16} color="pink" />
+                                </Box>
+                            }
+                        />
+                        <Stack gap={0}>
+                            <Text size="xs" c="dimmed" lh={1}>호감도</Text>
+                            <Text size="sm" fw={700} c="pink" lh={1}>{affectionScore}%</Text>
+                        </Stack>
+
+                        {/* Floating Delta Feedback */}
+                        <AnimatePresence>
+                            {affectionDelta && (
+                                <motion.div
+                                    key={affectionDelta.id}
+                                    initial={{ opacity: 0, y: 0 }}
+                                    animate={{ opacity: 1, y: -20 }}
+                                    exit={{ opacity: 0 }}
+                                    style={{
+                                        position: 'absolute',
+                                        right: 0,
+                                        top: -20,
+                                        color: affectionDelta.value > 0 ? '#ff6b6b' : '#74c0fc',
+                                        fontWeight: 'bold',
+                                        fontSize: '14px',
+                                        textShadow: '0 1px 2px black'
+                                    }}
+                                >
+                                    {affectionDelta.value > 0 ? `+${affectionDelta.value}` : affectionDelta.value}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </Box>
                 </Box>
 
@@ -252,7 +332,7 @@ export default function VisualNovel({
                     formatText={formatText}
                 />
             </Box>
-        </Box>
+        </Box >
     );
 }
 

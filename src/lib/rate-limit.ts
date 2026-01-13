@@ -8,7 +8,7 @@ type RateLimitStore = {
 // In-memory store (Resets on restart)
 const globalRateLimitStore: RateLimitStore = {};
 
-export function checkRateLimit(identifier: string, limit: number = 20): boolean {
+export function checkRateLimit(identifier: string, limit: number = 1000): boolean {
     const now = Date.now();
     const today = new Date(now).setHours(0, 0, 0, 0);
 
@@ -34,7 +34,7 @@ export function checkRateLimit(identifier: string, limit: number = 20): boolean 
     return true;
 }
 
-export function getRemainingRequests(identifier: string, limit: number = 20): number {
+export function getRemainingRequests(identifier: string, limit: number = 1000): number {
     const userData = globalRateLimitStore[identifier];
     if (!userData) return limit;
 

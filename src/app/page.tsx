@@ -11,7 +11,9 @@ import VisualNovel from '@/components/VisualNovel';
 import SajuDashboard from '@/components/SajuDashboard';
 import SettingsModal from '@/components/SettingsModal';
 import CharacterSelection from '@/components/CharacterSelection';
+// Removed Talisman Import
 import TitleScreen from '@/components/TitleScreen';
+import { saveEpisode, getRelevantEpisodes } from '@/lib/memory';
 import { CHARACTERS } from '@/lib/characters';
 import { Box, Drawer, ActionIcon, Modal, Text, Group, Stack } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -50,16 +52,26 @@ export default function Home() {
   const [alertMessage, setAlertMessage] = useState('');
   const [emailOptIn, setEmailOptIn] = useState('');
   const [clearHistoryOnSwitch, setClearHistoryOnSwitch] = useState(false);
+  const [affectionScores, setAffectionScores] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setIsInitialized(true);
+    // Load persisted data
+    const savedUser = localStorage.getItem('cosmic_user');
+    const savedHistory = localStorage.getItem('cosmic_history');
+    const savedChar = localStorage.getItem('cosmic_character');
+    const savedAffection = localStorage.getItem('cosmic_affection');
+
+    if (savedUser) setUserData(JSON.parse(savedUser));
+    if (savedHistory) setHistory(JSON.parse(savedHistory));
+    if (savedAffection) setAffectionScores(JSON.parse(savedAffection));
   }, []);
 
   // Removed apiKey local storage logic as it's server-side now
 
   const handleOnboardingComplete = (data: any) => {
     setUserData(data);
-    // Do NOT calculate Saju yet. Just save name and proceed to selection.
+    localStorage.setItem('cosmic_user', JSON.stringify(data));
   };
 
   const calculateAndSetSaju = (data: any) => {
@@ -99,8 +111,11 @@ export default function Home() {
     // Proceed to chat with pending character (Cheongsan)
     if (pendingCharacterId) {
       setCharacterId(pendingCharacterId);
+      localStorage.setItem('cosmic_character', pendingCharacterId);
       const char = CHARACTERS[pendingCharacterId];
-      setHistory([{ role: 'model', text: char.greeting, emotion: 'default' }]);
+      const newHistory = [{ role: 'model', text: char.greeting, emotion: 'default' }];
+      setHistory(newHistory);
+      localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
       setPendingCharacterId(null);
     }
   };
@@ -111,6 +126,7 @@ export default function Home() {
 
     if (pendingCharacterId) {
       setCharacterId(pendingCharacterId);
+      localStorage.setItem('cosmic_character', pendingCharacterId);
       initializeZionChat(pendingCharacterId, card);
       setPendingCharacterId(null);
     }
@@ -130,6 +146,7 @@ export default function Home() {
         body: JSON.stringify({
           message: "행운의 카드를 뽑았습니다. 해석해주세요.",
           characterId: charId,
+          userName: userData?.name || 'User',
           context: cardContext,
           history: [],
           turnstileToken // Send token
@@ -150,7 +167,9 @@ export default function Home() {
       }
 
       const response = await res.json();
-      setHistory([{ role: 'model', text: response.text, emotion: response.emotion }]);
+      const newHistory = [{ role: 'model', text: response.text, emotion: response.emotion }];
+      setHistory(newHistory);
+      localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
     } catch (e) {
       console.error(e);
       setHistory([{ role: 'model', text: "카드의 기운이 너무 강해 읽을 수가 없군요... 다시 시도해주세요.", emotion: 'default' }]);
@@ -163,8 +182,11 @@ export default function Home() {
     closePungryuModal();
     if (pendingCharacterId) {
       setCharacterId(pendingCharacterId);
+      localStorage.setItem('cosmic_character', pendingCharacterId);
       const char = CHARACTERS[pendingCharacterId];
-      setHistory([{ role: 'model', text: char.greeting, emotion: 'default' }]);
+      const newHistory = [{ role: 'model', text: char.greeting, emotion: 'default' }];
+      setHistory(newHistory);
+      localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
       setPendingCharacterId(null);
     }
   };
@@ -181,16 +203,76 @@ export default function Home() {
       openPungryuModal();
     } else {
       setCharacterId(id);
+      localStorage.setItem('cosmic_character', id);
       const char = CHARACTERS[id];
-      setHistory([{ role: 'model', text: char.greeting, emotion: 'default' }]);
+      const newHistory = [{ role: 'model', text: char.greeting, emotion: 'default' }];
+      setHistory(newHistory);
+      localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
     }
   };
 
+
+  const [lastVisit, setLastVisit] = useState<number>(0);
+
+  // Proactive Agency: Check last visit & Greet
+  useEffect(() => {
+    const checkProactive = async () => {
+      if (!userData || !characterId || history.length === 0) return;
+
+      const storedLastVisit = localStorage.getItem('cosmic_last_visit');
+      const now = Date.now();
+
+      if (storedLastVisit) {
+        const gap = now - parseInt(storedLastVisit);
+        // 24 hours = 86400000. 
+        if (gap > 86400000) {
+          console.log('[Agency] Proactive Greeting Triggered (Gap > 24h)');
+          try {
+            const memories = getRelevantEpisodes(3);
+            const currentAffection = affectionScores[characterId] || 30;
+
+            // Send hidden system prompt
+            const res = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                message: "[SYSTEM: User returned after a long absence (24h+). Initiate conversation proactively. Do not wait for user input. Ask about their well-being.]",
+                characterId,
+                userName: userData.name,
+                context: memories ? `[PAST MEMORIES]\n${memories}` : "",
+                history,
+                affectionScore: currentAffection
+              })
+            });
+            const data = await res.json();
+
+            // Add AI response ONLY (No user message shown)
+            const newHistory = [...history, { role: 'model' as const, text: data.text, emotion: data.emotion }];
+            setHistory(newHistory);
+            localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
+          } catch (e) {
+            console.error("Proactive Gen Failed", e);
+          }
+        }
+      }
+      localStorage.setItem('cosmic_last_visit', now.toString());
+    };
+
+    // Only run if we haven't checked this session? 
+    // Just run once on mount checks? 
+    // Since page reloads, this effect runs.
+    checkProactive();
+  }, [characterId]); // Depend on characterId to ensure we have context
+
   const handleSendMessage = async (text: string) => {
+    // Update visit time
+    localStorage.setItem('cosmic_last_visit', Date.now().toString());
+
     console.log('[Client] Sending message, token:', turnstileToken ? turnstileToken.substring(0, 20) + '...' : 'EMPTY');
 
     const newHistory = [...history, { role: 'user', text }];
     setHistory(newHistory);
+    localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
     setIsTyping(true);
 
     try {
@@ -202,28 +284,60 @@ export default function Home() {
         context = `Selected Tarot Card: ${selectedCard.name}\nMeaning: ${selectedCard.meaning}`;
       }
 
+      // Context Injection (Memory)
+      const memories = getRelevantEpisodes(3);
+      if (memories) {
+        context += `\n\n[PAST MEMORIES]\n${memories}`;
+      }
+
+      const currentAffection = characterId ? (affectionScores[characterId] || 30) : 30;
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
           characterId: characterId || 'cheongsan',
+          userName: userData?.name || 'User',
           context,
           history,
-          turnstileToken // Send token
+          turnstileToken, // Send token
+          affectionScore: currentAffection
         })
       });
 
       if (res.status === 429) {
         setAlertMessage('하루 대화 가능 횟수(20회)를 초과했습니다. 내일 다시 와주세요!');
         openAlertModal();
-        // Don't remove user message, but reply with limit message
-        setHistory([...newHistory, { role: 'model', text: "오늘의 대화 에너지가 소진되었습니다. 내일 다시 만나요.", emotion: 'default' }]);
+        const limitHistory = [...newHistory, { role: 'model', text: "오늘의 대화 에너지가 소진되었습니다. 내일 다시 만나요.", emotion: 'default' }];
+        setHistory(limitHistory);
+        localStorage.setItem('cosmic_history', JSON.stringify(limitHistory));
         return;
       }
 
       const response = await res.json();
-      setHistory([...newHistory, { role: 'model', text: response.text, emotion: response.emotion }]);
+      const updatedHistory = [...newHistory, { role: 'model', text: response.text, emotion: response.emotion }];
+      setHistory(updatedHistory);
+      localStorage.setItem('cosmic_history', JSON.stringify(updatedHistory));
+
+      // Save Episode if significant
+      if (Math.abs(response.affectionScore) >= 2) {
+        saveEpisode(text, response.text, response.emotion, response.affectionScore);
+      }
+
+      // Update Affection Score
+      if (characterId && response.affectionScore) {
+        const currentScore = affectionScores[characterId] || 30; // Default starts at 30
+        const delta = response.affectionScore;
+        const newScore = Math.min(100, Math.max(0, currentScore + delta));
+
+        const updatedScores = { ...affectionScores, [characterId]: newScore };
+        setAffectionScores(updatedScores);
+        localStorage.setItem('cosmic_affection', JSON.stringify(updatedScores));
+
+        console.log(`[Affection] ${characterId}: ${currentScore} -> ${newScore} (Delta: ${delta})`);
+      }
+
     } catch (error) {
       console.error(error);
       setHistory([...newHistory, { role: 'model', text: "운명의 흐름에 일시적인 장애가 발생했군요.", emotion: 'frust' }]);
@@ -240,11 +354,13 @@ export default function Home() {
         localStorage.removeItem('cosmic_user');
         localStorage.removeItem('cosmic_history');
         localStorage.removeItem('cosmic_character');
+        localStorage.removeItem('cosmic_affection');
         setUserData(null);
         setSaju(null);
         setHistory([]);
         setCharacterId(null);
         setSelectedCard(null);
+        setAffectionScores({});
         closeSettings();
         closeConfirmModal();
       }
@@ -399,6 +515,7 @@ export default function Home() {
                 onSendMessage={handleSendMessage}
                 isTyping={isTyping}
                 characterId={characterId}
+                affectionScore={affectionScores[characterId] || 30}
                 onSwitchToCharacter={(id) => {
                   if (id === characterId) return;
                   // Directly switch, handling prerequisites via existing handler logic if needed, 

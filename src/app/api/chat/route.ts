@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
-        const { message, characterId, context, history, turnstileToken } = body;
+        const { message, characterId, userName, context, history, turnstileToken, affectionScore } = body;
 
         // 3. Verify Turnstile Token
         if (process.env.TURNSTILE_SECRET_KEY) {
@@ -39,11 +39,20 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Server Configuration Error: API Key missing" }, { status: 500 });
         }
 
-        const response = await generateCharacterResponse(apiKey, characterId, message, context, history);
+        const response = await generateCharacterResponse(
+            apiKey,
+            characterId,
+            userName || 'User',
+            message,
+            context,
+            history,
+            affectionScore || 30
+        );
 
         return NextResponse.json({
             text: response.text,
             emotion: response.emotion,
+            affectionScore: response.affectionScore,
             remaining
         });
 
