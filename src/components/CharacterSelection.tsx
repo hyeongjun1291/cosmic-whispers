@@ -1,6 +1,6 @@
 'use client';
 
-import { SimpleGrid, Card, Text, Group, Badge, Button, Stack, Image, Box, ActionIcon } from '@mantine/core';
+import { SimpleGrid, Card, Text, Group, Badge, Button, Stack, Image, Box, ActionIcon, Indicator } from '@mantine/core';
 import { CHARACTERS } from '@/lib/characters';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
@@ -8,9 +8,10 @@ import { IconBrandInstagram, IconBrandX } from '@tabler/icons-react';
 
 interface CharacterSelectionProps {
     onSelect: (characterId: string) => void;
+    notifications?: Record<string, boolean>;
 }
 
-export default function CharacterSelection({ onSelect }: CharacterSelectionProps) {
+export default function CharacterSelection({ onSelect, notifications = {} }: CharacterSelectionProps) {
     const chars = Object.values(CHARACTERS);
     const [activeIndex, setActiveIndex] = useState(0);
 
@@ -96,17 +97,42 @@ export default function CharacterSelection({ onSelect }: CharacterSelectionProps
                 </Text>
             </Stack>
 
-            {/* 3D Cover Flow Container */}
-            <Box
-                w="100%"
-                h={600}
-                style={{ position: 'relative', perspective: '1000px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}
+            {/* 3D Cover Flow Container - Swipe Enabled */}
+            <motion.div
+                style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: 600,
+                    perspective: '1000px',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    cursor: 'grab',
+                    touchAction: 'pan-y' // Allow vertical scroll, capture horizontal swipe
+                }}
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.2}
+                onDragEnd={(e, { offset, velocity }) => {
+                    const swipe = offset.x; // + is Right (Prev), - is Left (Next)
+
+                    if (swipe < -50 || velocity.x < -500) {
+                        handleNext();
+                    } else if (swipe > 50 || velocity.x > 500) {
+                        handlePrev();
+                    }
+                }}
                 onClick={(e) => {
+                    // Fallback for click navigation (mostly desktop)
+                    // On mobile, swipe is primary.
                     const { clientX } = e;
                     const centerX = window.innerWidth / 2;
-                    if (clientX > centerX + 100) { // Buffer for center card
+                    // Only trigger if not dragged significantly (implied by click event usually, but strict check is hard without state)
+                    // Simple distinct zones:
+                    if (clientX > centerX + 120) {
                         handleNext();
-                    } else if (clientX < centerX - 100) {
+                    } else if (clientX < centerX - 120) {
                         handlePrev();
                     }
                 }}
@@ -137,70 +163,81 @@ export default function CharacterSelection({ onSelect }: CharacterSelectionProps
                                         pointerEvents: 'auto' // Re-enable pointer events for cards
                                     }}
                                 >
-                                    <Card
-                                        padding="lg"
-                                        radius="md"
+                                    <Indicator
+                                        color="red"
+                                        size={20}
                                         withBorder
-                                        style={{
-                                            borderColor: 'rgba(255, 215, 0, 0.5)',
-                                            backgroundColor: 'rgba(20, 20, 30, 0.9)',
-                                            backdropFilter: 'blur(10px)',
-                                            height: '100%',
-                                            boxShadow: style.zIndex === 10 ? '0 0 30px rgba(255,215,0,0.3)' : 'none'
-                                        }}
-                                        onClick={(e) => {
-                                            // Only stop propagation for the active card, so clicking it doesn't trigger parent's Left/Right navigation.
-                                            // Clicking neighbors should bubble up to parent's handler which detects side clicks.
-                                            if (index === activeIndex) {
-                                                e.stopPropagation();
-                                            }
-                                        }}
+                                        processing
+                                        disabled={!notifications[char.id]}
+                                        offset={15}
+                                        position="top-end"
+                                        style={{ zIndex: 100 }}
                                     >
-                                        <Group justify="space-between" mb="xs">
-                                            <Text fw={700} c="white" size="lg">{char.name}</Text>
-                                            <Badge color={char.color} variant="filled">{char.title}</Badge>
-                                        </Group>
-
-                                        <Card.Section>
-                                            <Image
-                                                src={`/images/characters/${char.imageNumber}_default.jpg`}
-                                                height={320}
-                                                fit="cover"
-                                                alt={char.name}
-                                                style={{ objectPosition: 'top' }}
-                                            />
-                                        </Card.Section>
-
-                                        <Text size="sm" c="gray.4" my="md" h={60} fw={500} lineClamp={3}>
-                                            {char.description}
-                                        </Text>
-
-                                        <Button
-                                            variant="filled"
-                                            fullWidth
+                                        <Card
+                                            padding="lg"
                                             radius="md"
-                                            onClick={(e) => {
-                                                e.stopPropagation(); // Prevent navigation
-                                                onSelect(char.id);
-                                            }}
+                                            withBorder
                                             style={{
-                                                backgroundColor: char.color,
-                                                color: 'white',
-                                                fontWeight: 700,
-                                                opacity: index === activeIndex ? 1 : 0.5,
-                                                marginTop: 'auto',
-                                                display: index === activeIndex ? 'block' : 'none' // Hide button on non-active
+                                                borderColor: notifications[char.id] ? 'red' : 'rgba(255, 215, 0, 0.5)', // Highlight border if notified
+                                                backgroundColor: 'rgba(20, 20, 30, 0.9)',
+                                                backdropFilter: 'blur(10px)',
+                                                height: '100%',
+                                                boxShadow: style.zIndex === 10 ? '0 0 30px rgba(255,215,0,0.3)' : 'none'
+                                            }}
+                                            onClick={(e) => {
+                                                // Only stop propagation for the active card, so clicking it doesn't trigger parent's Left/Right navigation.
+                                                // Clicking neighbors should bubble up to parent's handler which detects side clicks.
+                                                if (index === activeIndex) {
+                                                    e.stopPropagation();
+                                                }
                                             }}
                                         >
-                                            인연 맺기
-                                        </Button>
-                                    </Card>
+                                            <Group justify="space-between" mb="xs">
+                                                <Text fw={700} c="white" size="lg">{char.name}</Text>
+                                                <Badge color={char.color} variant="filled">{char.title}</Badge>
+                                            </Group>
+
+                                            <Card.Section>
+                                                <Image
+                                                    src={`/images/characters/${char.imageNumber}_default.jpg`}
+                                                    height={320}
+                                                    fit="cover"
+                                                    alt={char.name}
+                                                    style={{ objectPosition: 'top' }}
+                                                />
+                                            </Card.Section>
+
+                                            <Text size="sm" c="gray.4" my="md" h={60} fw={500} lineClamp={3}>
+                                                {char.description}
+                                            </Text>
+
+                                            <Button
+                                                variant="filled"
+                                                fullWidth
+                                                radius="md"
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); // Prevent navigation
+                                                    onSelect(char.id);
+                                                }}
+                                                style={{
+                                                    backgroundColor: char.color,
+                                                    color: 'white',
+                                                    fontWeight: 700,
+                                                    opacity: index === activeIndex ? 1 : 0.5,
+                                                    marginTop: 'auto',
+                                                    display: index === activeIndex ? 'block' : 'none' // Hide button on non-active
+                                                }}
+                                            >
+                                                인연 맺기
+                                            </Button>
+                                        </Card>
+                                    </Indicator>
                                 </motion.div>
                             );
                         })}
                     </AnimatePresence>
                 </Box>
-            </Box>
+            </motion.div>
 
             {/* Social Media Follow Section */}
             <Box mt="xl" p="xl" style={{ borderTop: '1px solid rgba(255,215,0,0.2)', width: '100%', maxWidth: '600px' }}>

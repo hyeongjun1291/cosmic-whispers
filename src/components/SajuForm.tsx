@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { TextInput, Select, Button, Stack, Title, Text, Group, Box, Checkbox } from '@mantine/core';
-import { DateInput } from '@mantine/dates';
+import { DatePickerInput } from '@mantine/dates';
 import { IconSparkles } from '@tabler/icons-react';
 import { motion } from 'framer-motion';
 
@@ -23,13 +23,15 @@ export default function SajuForm({ onComplete, onCancel }: SajuFormProps) {
                 <Title order={3} fw={300} c="gold" ta="center">운명의 바퀴를 맞춥니다.</Title>
                 <Text size="sm" c="dimmed" ta="center">태어난 날짜와 시간을 정확히 기록해주십시오.</Text>
 
-                <DateInput
+                <DatePickerInput
                     label="생년월일"
                     placeholder="날짜 선택"
                     value={formData.birthDate}
-                    onChange={(d: any) => setFormData({ ...formData, birthDate: d })}
+                    onChange={(d) => setFormData({ ...formData, birthDate: d })}
                     size="md"
+                    valueFormat="YYYY년 MM월 DD일"
                     styles={{ input: { fontSize: '16px' } }} // Mobile friendly
+                    inputProps={{ inputMode: 'none' }} // Prevent virtual keyboard
                 />
 
                 <Group gap="xs" align="flex-end">

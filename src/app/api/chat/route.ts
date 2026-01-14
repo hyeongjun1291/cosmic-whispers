@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
-        const { message, characterId, userName, context, history, turnstileToken, affectionScore } = body;
+        const { message, characterId, userName, context, history, turnstileToken } = body;
 
         // 3. Verify Turnstile Token
         if (process.env.TURNSTILE_SECRET_KEY) {
@@ -45,14 +45,13 @@ export async function POST(req: NextRequest) {
             userName || 'User',
             message,
             context,
-            history,
-            affectionScore || 30
+            history
         );
 
         return NextResponse.json({
             text: response.text,
             emotion: response.emotion,
-            affectionScore: response.affectionScore,
+            thought: response.thought,
             remaining
         });
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ColorSchemeScript, MantineProvider, createTheme } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
 import "@mantine/core/styles.css";
 import "@mantine/dates/styles.css";
 import "@mantine/notifications/styles.css";
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body>
         <div className="starfield" />
         <MantineProvider theme={theme} defaultColorScheme="dark">
+          <Notifications position="top-center" zIndex={2000} />
           {children}
         </MantineProvider>
       </body>

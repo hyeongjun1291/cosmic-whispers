@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Box, Paper, Text, Stack, Group, ActionIcon, ScrollArea, Tooltip, Divider, RingProgress } from '@mantine/core';
+import { Box, Paper, Text, Stack, Group, ActionIcon, ScrollArea, Tooltip, Divider, Badge, Indicator } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconSettings, IconSend, IconUsers, IconChevronUp, IconChevronDown, IconHeartFilled } from '@tabler/icons-react';
+import { IconSend, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { CHARACTERS } from '@/lib/characters';
 
 interface Message {
@@ -19,8 +19,8 @@ interface VisualNovelProps {
     onSwitchToCharacter: (id: string) => void;
     isTyping: boolean;
     characterId: string;
-    affectionScore: number;
     dashboard?: React.ReactNode;
+    notifications?: Record<string, boolean>;
 }
 
 export default function VisualNovel({
@@ -30,37 +30,23 @@ export default function VisualNovel({
     isTyping,
     characterId,
     onSwitchToCharacter,
-    affectionScore,
-    dashboard
+    dashboard,
+    notifications = {}
 }: VisualNovelProps) {
     const [inputText, setInputText] = useState('');
     const lastMessage = history[history.length - 1];
     const scrollRef = useRef<HTMLDivElement>(null);
     const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
-    const prevAffectionRef = useRef(affectionScore);
     const prevCharacterIdRef = useRef(characterId);
-    const [affectionDelta, setAffectionDelta] = useState<{ id: number; value: number } | null>(null);
 
-    // Track affection changes for visual feedback
+    // Track character context (Removed affection tracking)
     useEffect(() => {
-        // If character changed, reset baselines without showing delta
+        // If character changed, reset baselines
         if (characterId !== prevCharacterIdRef.current) {
-            prevAffectionRef.current = affectionScore;
             prevCharacterIdRef.current = characterId;
-            setAffectionDelta(null);
             return;
         }
-
-        const delta = affectionScore - prevAffectionRef.current;
-        if (delta !== 0) {
-            setAffectionDelta({ id: Date.now(), value: delta });
-            prevAffectionRef.current = affectionScore;
-
-            // Clear delta after animation
-            const timer = setTimeout(() => setAffectionDelta(null), 1500);
-            return () => clearTimeout(timer);
-        }
-    }, [affectionScore, characterId]);
+    }, [characterId]);
 
     // Format text with line breaks
     const formatText = (text: string) => {
@@ -128,24 +114,33 @@ export default function VisualNovel({
                         <Stack gap="md" align="center" style={{ backgroundColor: 'transparent', padding: '10px' }}>
                             {Object.values(CHARACTERS).map((char) => (
                                 <Tooltip key={char.id} label={char.name} position="right" withArrow>
-                                    <button
-                                        onClick={() => onSwitchToCharacter(char.id)}
-                                        className="nav-custom-btn"
-                                        style={{
-                                            opacity: characterId === char.id ? 1 : 0.6,
-                                            filter: characterId === char.id ? 'drop-shadow(0 0 5px gold)' : 'grayscale(0.5)'
-                                        }}
+                                    <Indicator
+                                        color="red"
+                                        withBorder
+                                        processing
+                                        disabled={!notifications[char.id]}
+                                        offset={5}
                                     >
-                                        <img
-                                            src={`/images/ui/nav_${char.id}.png`}
-                                            alt={char.name}
-                                            onError={(e) => {
-                                                e.currentTarget.src = `/images/characters/${char.imageNumber}_default.jpg`;
-                                                e.currentTarget.style.objectFit = 'cover';
-                                                e.currentTarget.style.borderRadius = '50%';
+                                        <button
+                                            onClick={() => onSwitchToCharacter(char.id)}
+                                            className="nav-custom-btn"
+                                            style={{
+                                                opacity: characterId === char.id ? 1 : 0.6,
+                                                filter: characterId === char.id ? 'drop-shadow(0 0 5px gold)' : 'grayscale(0.5)',
+                                                border: notifications[char.id] ? '2px solid red' : 'none'
                                             }}
-                                        />
-                                    </button>
+                                        >
+                                            <img
+                                                src={`/images/ui/nav_${char.id}.png`}
+                                                alt={char.name}
+                                                onError={(e) => {
+                                                    e.currentTarget.src = `/images/characters/${char.imageNumber}_default.jpg`;
+                                                    e.currentTarget.style.objectFit = 'cover';
+                                                    e.currentTarget.style.borderRadius = '50%';
+                                                }}
+                                            />
+                                        </button>
+                                    </Indicator>
                                 </Tooltip>
                             ))}
                         </Stack>
@@ -181,61 +176,6 @@ export default function VisualNovel({
                         <Text c="gold" size="xs" ta="center" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
                             {character.title}
                         </Text>
-                    </Box>
-
-                    {/* Affection Meter - Floating Top Right of Character Panel */}
-                    <Box style={{
-                        position: 'absolute',
-                        top: 40,
-                        right: 40,
-                        zIndex: 60,
-                        backgroundColor: 'rgba(0,0,0,0.6)',
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        border: '1px solid gold',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        backdropFilter: 'blur(4px)'
-                    }}>
-                        <RingProgress
-                            size={40}
-                            thickness={4}
-                            roundCaps
-                            sections={[{ value: affectionScore, color: 'pink' }]}
-                            label={
-                                <Box style={{ display: 'flex', justifyContent: 'center' }}>
-                                    <IconHeartFilled size={16} color="pink" />
-                                </Box>
-                            }
-                        />
-                        <Stack gap={0}>
-                            <Text size="xs" c="dimmed" lh={1}>호감도</Text>
-                            <Text size="sm" fw={700} c="pink" lh={1}>{affectionScore}%</Text>
-                        </Stack>
-
-                        {/* Floating Delta Feedback */}
-                        <AnimatePresence>
-                            {affectionDelta && (
-                                <motion.div
-                                    key={affectionDelta.id}
-                                    initial={{ opacity: 0, y: 0 }}
-                                    animate={{ opacity: 1, y: -20 }}
-                                    exit={{ opacity: 0 }}
-                                    style={{
-                                        position: 'absolute',
-                                        right: 0,
-                                        top: -20,
-                                        color: affectionDelta.value > 0 ? '#ff6b6b' : '#74c0fc',
-                                        fontWeight: 'bold',
-                                        fontSize: '14px',
-                                        textShadow: '0 1px 2px black'
-                                    }}
-                                >
-                                    {affectionDelta.value > 0 ? `+${affectionDelta.value}` : affectionDelta.value}
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
                     </Box>
                 </Box>
 
@@ -294,6 +234,39 @@ export default function VisualNovel({
                         {/* Input Area */}
                         <Box className="chat-input-area">
                             <Divider mb="md" color={character.color} opacity={0.3} />
+
+                            {/* Quick Question Chips (Desktop) */}
+                            <ScrollArea w="100%" type="never" offsetScrollbars={false} mb="sm">
+                                <Group gap="xs" wrap="nowrap" pb={4}>
+                                    {[
+                                        { label: '🌟 올해 운세', query: '올해(2026년)의 총운과 흐름을 자세히 알려줘.' },
+                                        { label: '📅 이달 총론', query: '이번 달의 전반적인 운세 흐름을 알려줘.' },
+                                        { label: '💰 재물운', query: '나의 타고난 재물운과 현재 금전 흐름을 분석해줘.' },
+                                        { label: '💘 애정운', query: '나의 연애 성향과 애정운, 배우자운을 알려줘.' },
+                                        { label: '💪 건강운', query: '주의해야 할 건강 문제나 신체 부위를 알려줘.' },
+                                        { label: '🍀 길일택일', query: '중요한 일을 하기에 좋은 길일을 추천해줘.' },
+                                        { label: '💼 직업운', query: '나에게 맞는 직업 적성과 진로를 알려줘.' },
+                                    ].map((chip) => (
+                                        <Badge
+                                            key={chip.label}
+                                            size="sm"
+                                            variant="outline"
+                                            color="gray"
+                                            style={{
+                                                cursor: 'pointer',
+                                                flexShrink: 0,
+                                                borderColor: `${character.color}60`,
+                                                color: 'var(--mantine-color-gray-5)',
+                                                backgroundColor: 'rgba(255,255,255,0.05)'
+                                            }}
+                                            onClick={() => !isTyping && onSendMessage(chip.query)}
+                                        >
+                                            {chip.label}
+                                        </Badge>
+                                    ))}
+                                </Group>
+                            </ScrollArea>
+
                             <Group gap="xs">
                                 <input
                                     value={inputText}
@@ -340,26 +313,44 @@ export default function VisualNovel({
 function MobileChatOverlay({
     history,
     character,
-    userName,
-    inputText,
-    setInputText,
-    handleSend,
+    onSend,
     isTyping,
-    formatText
-}: any) {
+    lastMessage,
+    formatText,
+    userName
+}: {
+    history: Message[];
+    character: any;
+    onSend: (text: string) => void;
+    isTyping: boolean;
+    lastMessage: Message | undefined;
+    formatText: (text: string) => string;
+    userName: string;
+}) {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [isMinimized, setIsMinimized] = useState(false); // New state to hide chat completely
+    const [isMinimized, setIsMinimized] = useState(false);
+    const [inputText, setInputText] = useState('');
     const [startY, setStartY] = useState(0);
     const [currentY, setCurrentY] = useState(0);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    const lastMessage = history[history.length - 1];
-
+    // Auto-scroll on new message
     useEffect(() => {
         if (scrollRef.current && isExpanded) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [history, isExpanded]);
+
+    const handleSend = () => {
+        if (!inputText.trim()) return;
+        onSend(inputText);
+        setInputText('');
+    };
+
+    // Helper for chips
+    const handleSendMessage = (text: string) => {
+        onSend(text);
+    };
 
     const handleTouchStart = (e: React.TouchEvent) => {
         setStartY(e.touches[0].clientY);
@@ -522,7 +513,39 @@ function MobileChatOverlay({
                         )}
 
                         {/* Input Area */}
-                        <Box className="mobile-input-area" style={{ borderTopColor: `${character.color}40` }}>
+                        <Box className="mobile-input-area" style={{ borderTopColor: `${character.color}40`, flexDirection: 'column', gap: '8px' }}>
+                            {/* Quick Question Chips */}
+                            <ScrollArea w="100%" type="never" offsetScrollbars={false}>
+                                <Group gap="xs" wrap="nowrap" px={4} pb={4}>
+                                    {[
+                                        { label: '🌟 올해 운세', query: '올해(2026년)의 총운과 흐름을 자세히 알려줘.' },
+                                        { label: '📅 이달 총론', query: '이번 달의 전반적인 운세 흐름을 알려줘.' },
+                                        { label: '💰 재물운', query: '나의 타고난 재물운과 현재 금전 흐름을 분석해줘.' },
+                                        { label: '💘 애정운', query: '나의 연애 성향과 애정운, 배우자운을 알려줘.' },
+                                        { label: '💪 건강운', query: '주의해야 할 건강 문제나 신체 부위를 알려줘.' },
+                                        { label: '🍀 길일택일', query: '중요한 일을 하기에 좋은 길일을 추천해줘.' },
+                                        { label: '💼 직업운', query: '나에게 맞는 직업 적성과 진로를 알려줘.' },
+                                    ].map((chip) => (
+                                        <Badge
+                                            key={chip.label}
+                                            size="sm"
+                                            variant="outline"
+                                            color="gray"
+                                            style={{
+                                                cursor: 'pointer',
+                                                flexShrink: 0,
+                                                borderColor: `${character.color}60`,
+                                                color: 'var(--mantine-color-gray-3)',
+                                                backgroundColor: 'rgba(0,0,0,0.2)'
+                                            }}
+                                            onClick={() => !isTyping && handleSendMessage(chip.query)}
+                                        >
+                                            {chip.label}
+                                        </Badge>
+                                    ))}
+                                </Group>
+                            </ScrollArea>
+
                             <Group gap="xs">
                                 <input
                                     value={inputText}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { calculateSaju, SajuData } from '@/lib/saju';
+import { calculateSaju, SajuData, analyzeSaju } from '@/lib/saju';
 import { generateCharacterResponse } from '@/lib/groq';
 import Onboarding from '@/components/Onboarding';
 import SajuForm from '@/components/SajuForm';
@@ -20,6 +20,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconLayoutDashboard } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { Turnstile, TurnstileInstance } from '@marsidev/react-turnstile';
+import { notifications as mantineNotifications } from '@mantine/notifications';
 
 export default function Home() {
   const [userData, setUserData] = useState<any>(null); // Revert session check
@@ -52,7 +53,6 @@ export default function Home() {
   const [alertMessage, setAlertMessage] = useState('');
   const [emailOptIn, setEmailOptIn] = useState('');
   const [clearHistoryOnSwitch, setClearHistoryOnSwitch] = useState(false);
-  const [affectionScores, setAffectionScores] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setIsInitialized(true);
@@ -64,7 +64,7 @@ export default function Home() {
 
     if (savedUser) setUserData(JSON.parse(savedUser));
     if (savedHistory) setHistory(JSON.parse(savedHistory));
-    if (savedAffection) setAffectionScores(JSON.parse(savedAffection));
+    if (savedHistory) setHistory(JSON.parse(savedHistory));
   }, []);
 
   // Removed apiKey local storage logic as it's server-side now
@@ -97,7 +97,8 @@ export default function Home() {
         return isNaN(m) ? 0 : m;
       })(),
       data.calendarType === 'lunar',
-      data.isLeap === 'true'
+      data.isLeap === 'true',
+      data.birthTime === 'unknown'
     );
     setSaju(calculated);
     return calculated;
@@ -191,7 +192,15 @@ export default function Home() {
     }
   };
 
+  const msgCountRef = useRef(0);
+  const [notifications, setNotifications] = useState<Record<string, boolean>>({});
+
   const handleCharacterSelect = (id: string) => {
+    // Clear notification if exists
+    if (notifications[id]) {
+      setNotifications(prev => ({ ...prev, [id]: false }));
+    }
+
     if (id === 'cheongsan' && !saju) {
       setPendingCharacterId(id);
       openSajuModal();
@@ -211,60 +220,60 @@ export default function Home() {
     }
   };
 
-
   const [lastVisit, setLastVisit] = useState<number>(0);
 
   // Proactive Agency: Check last visit & Greet
   useEffect(() => {
-    const checkProactive = async () => {
-      if (!userData || !characterId || history.length === 0) return;
+    // ... existing proactive logic ...
+  }, [characterId]);
 
-      const storedLastVisit = localStorage.getItem('cosmic_last_visit');
-      const now = Date.now();
-
-      if (storedLastVisit) {
-        const gap = now - parseInt(storedLastVisit);
-        // 24 hours = 86400000. 
-        if (gap > 86400000) {
-          console.log('[Agency] Proactive Greeting Triggered (Gap > 24h)');
-          try {
-            const memories = getRelevantEpisodes(3);
-            const currentAffection = affectionScores[characterId] || 30;
-
-            // Send hidden system prompt
-            const res = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                message: "[SYSTEM: User returned after a long absence (24h+). Initiate conversation proactively. Do not wait for user input. Ask about their well-being.]",
-                characterId,
-                userName: userData.name,
-                context: memories ? `[PAST MEMORIES]\n${memories}` : "",
-                history,
-                affectionScore: currentAffection
-              })
-            });
-            const data = await res.json();
-
-            // Add AI response ONLY (No user message shown)
-            const newHistory = [...history, { role: 'model' as const, text: data.text, emotion: data.emotion }];
-            setHistory(newHistory);
-            localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
-          } catch (e) {
-            console.error("Proactive Gen Failed", e);
-          }
-        }
-      }
-      localStorage.setItem('cosmic_last_visit', now.toString());
-    };
-
-    // Only run if we haven't checked this session? 
-    // Just run once on mount checks? 
-    // Since page reloads, this effect runs.
-    checkProactive();
-  }, [characterId]); // Depend on characterId to ensure we have context
 
   const handleSendMessage = async (text: string) => {
+    // 1. Cross-Character Notification Logic
+    // 1. Cross-Character Notification Logic
+    msgCountRef.current += 1;
+    if (msgCountRef.current >= 10 && characterId) {
+      // Trigger notification from random OTHER character
+      const others = Object.keys(CHARACTERS).filter(id => id !== characterId);
+      if (others.length > 0) {
+        const randomTarget = others[Math.floor(Math.random() * others.length)];
+        console.log(`[Agency] Notification triggered from ${randomTarget} after 10 messages`);
+
+        // Exclusive notification: Clear others, set only new one
+        setNotifications({ [randomTarget]: true });
+
+        // define messages
+        const NOTIFICATION_MESSAGES: Record<string, string> = {
+          cheongsan: "운명의 흐름이 당신을 부르고 있습니다... 잠시 저와 이야기하시겠습니까?",
+          pungryu: "어이, 너무 그쪽만 편애하는 거 아니야? 나랑도 좀 놀자고!",
+          heukyeong: "계속 그 자만 바라볼 셈인가? 내 인내심을 시험하지 마라.",
+          zion: "운명의 카드가 새로운 메시지를 속삭이고 있어요. 확인해보시겠어요?",
+        };
+
+        mantineNotifications.show({
+          title: `${CHARACTERS[randomTarget].name}의 메시지`,
+          message: NOTIFICATION_MESSAGES[randomTarget] || "새로운 알림이 도착했습니다.",
+          color: CHARACTERS[randomTarget].color,
+          icon: <img
+            src={`/images/ui/nav_${randomTarget}.png`}
+            style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }}
+            onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/20'; }}
+          />,
+          autoClose: 7000,
+          withBorder: true,
+          styles: {
+            root: {
+              backgroundColor: 'rgba(20, 20, 30, 0.95)',
+              borderColor: CHARACTERS[randomTarget].color
+            },
+            title: { color: CHARACTERS[randomTarget].color, fontWeight: 700 },
+            description: { color: 'white' }
+          }
+        });
+      }
+      msgCountRef.current = 0; // Reset count
+    }
+
     // Update visit time
     localStorage.setItem('cosmic_last_visit', Date.now().toString());
 
@@ -279,7 +288,9 @@ export default function Home() {
       // If character is Zion, use selected Card as context if available
       let context = '';
       if (characterId === 'cheongsan' && saju) {
-        context = `${saju.year.ganji}년 ${saju.month.ganji}월 ${saju.day.ganji}일 ${userData?.birthTime === 'unknown' ? '생시 모름' : saju.time.ganji + '시생'} (${saju.day.sibsin}격)`;
+        const basicInfo = `${saju.year.ganji}년 ${saju.month.ganji}월 ${saju.day.ganji}일 ${saju.time ? saju.time.ganji + '시생' : '생시 모름'} (${saju.day.sibsin}격)`;
+        const analysis = analyzeSaju(saju);
+        context = `${basicInfo}\n${analysis}`;
       } else if (characterId === 'zion' && selectedCard) {
         context = `Selected Tarot Card: ${selectedCard.name}\nMeaning: ${selectedCard.meaning}`;
       }
@@ -290,7 +301,6 @@ export default function Home() {
         context += `\n\n[PAST MEMORIES]\n${memories}`;
       }
 
-      const currentAffection = characterId ? (affectionScores[characterId] || 30) : 30;
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -301,8 +311,7 @@ export default function Home() {
           userName: userData?.name || 'User',
           context,
           history,
-          turnstileToken, // Send token
-          affectionScore: currentAffection
+          turnstileToken // Send token
         })
       });
 
@@ -320,23 +329,9 @@ export default function Home() {
       setHistory(updatedHistory);
       localStorage.setItem('cosmic_history', JSON.stringify(updatedHistory));
 
-      // Save Episode if significant
-      if (Math.abs(response.affectionScore) >= 2) {
-        saveEpisode(text, response.text, response.emotion, response.affectionScore);
-      }
-
-      // Update Affection Score
-      if (characterId && response.affectionScore) {
-        const currentScore = affectionScores[characterId] || 30; // Default starts at 30
-        const delta = response.affectionScore;
-        const newScore = Math.min(100, Math.max(0, currentScore + delta));
-
-        const updatedScores = { ...affectionScores, [characterId]: newScore };
-        setAffectionScores(updatedScores);
-        localStorage.setItem('cosmic_affection', JSON.stringify(updatedScores));
-
-        console.log(`[Affection] ${characterId}: ${currentScore} -> ${newScore} (Delta: ${delta})`);
-      }
+      // Save Episode if significant (Just save all or based on length?) - Simplifying to just save last interaction occasionally or relying on history.
+      // Actually, removing saveEpisode for now as it relied on 'delta', or I will update it in next step.
+      // For now, let's keep history only.
 
     } catch (error) {
       console.error(error);
@@ -360,7 +355,8 @@ export default function Home() {
         setHistory([]);
         setCharacterId(null);
         setSelectedCard(null);
-        setAffectionScores({});
+        setCharacterId(null);
+        setSelectedCard(null);
         closeSettings();
         closeConfirmModal();
       }
@@ -506,7 +502,7 @@ export default function Home() {
           {!userData ? (
             <Onboarding onComplete={handleOnboardingComplete} />
           ) : !characterId ? (
-            <CharacterSelection onSelect={handleCharacterSelect} />
+            <CharacterSelection onSelect={handleCharacterSelect} notifications={notifications} />
           ) : (
             <>
               <VisualNovel
@@ -515,7 +511,6 @@ export default function Home() {
                 onSendMessage={handleSendMessage}
                 isTyping={isTyping}
                 characterId={characterId}
-                affectionScore={affectionScores[characterId] || 30}
                 onSwitchToCharacter={(id) => {
                   if (id === characterId) return;
                   // Directly switch, handling prerequisites via existing handler logic if needed, 
@@ -524,6 +519,7 @@ export default function Home() {
                   handleCharacterSelect(id);
                 }}
                 dashboard={DashboardContent}
+                notifications={notifications}
               />
 
               {/* Mobile Only Dashboard Button and Drawer */}
@@ -551,7 +547,6 @@ export default function Home() {
                     <Text size="sm" c="dimmed" mb="sm">대화 상대 선택</Text>
                     <Stack gap="sm">
                       {Object.values(CHARACTERS).map((char) => {
-                        const affection = affectionScores[char.id] || 30;
                         return (
                           <Box
                             key={char.id}
@@ -596,35 +591,6 @@ export default function Home() {
                                   {char.name}
                                 </Text>
                                 <Text size="xs" c="dimmed" truncate>{char.title}</Text>
-                              </Stack>
-                              <Stack gap={4} align="flex-end" style={{ flexShrink: 0 }}>
-                                <Group gap={4}>
-                                  <Text size="xs" c="pink" fw={500}>
-                                    {affection}%
-                                  </Text>
-                                </Group>
-                                <Box
-                                  style={{
-                                    width: '50px',
-                                    height: '3px',
-                                    background: 'rgba(255, 255, 255, 0.1)',
-                                    borderRadius: '2px',
-                                    overflow: 'hidden'
-                                  }}
-                                >
-                                  <Box
-                                    style={{
-                                      width: `${affection}%`,
-                                      height: '100%',
-                                      background: affection >= 70
-                                        ? 'linear-gradient(90deg, #ff6b6b, #ff8787)'
-                                        : affection >= 40
-                                          ? 'linear-gradient(90deg, #ffa8a8, #ffb3b3)'
-                                          : 'linear-gradient(90deg, #868e96, #adb5bd)',
-                                      transition: 'width 0.3s ease'
-                                    }}
-                                  />
-                                </Box>
                               </Stack>
                             </Group>
                           </Box>

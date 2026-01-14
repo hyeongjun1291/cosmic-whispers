@@ -5,12 +5,11 @@ export interface Episode {
     userText: string;
     aiText: string;
     emotion: string;
-    delta: number;
 }
 
 const STORAGE_KEY = 'cosmic_episodes';
 
-export const saveEpisode = (userText: string, aiText: string, emotion: string, delta: number) => {
+export const saveEpisode = (userText: string, aiText: string, emotion: string) => {
     if (typeof window === 'undefined') return;
 
     const newEpisode: Episode = {
@@ -19,8 +18,7 @@ export const saveEpisode = (userText: string, aiText: string, emotion: string, d
         dateString: new Date().toLocaleString(),
         userText,
         aiText,
-        emotion,
-        delta
+        emotion
     };
 
     const existing = getEpisodes();
@@ -39,10 +37,8 @@ export const getRelevantEpisodes = (limit: number = 3): string => {
     const episodes = getEpisodes();
     if (episodes.length === 0) return "";
 
-    // Simple strategy: Get most recent significant moments (delta >= 3 or <= -3)
-    // Or just recent ones if high impact not found.
-    const significant = episodes.filter(e => Math.abs(e.delta) >= 2);
-    const target = significant.length > 0 ? significant : episodes;
+    // Simple strategy: Just get the most recent ones as we removed significance (delta)
+    const target = episodes;
 
     return target.slice(0, limit).map(e =>
         `- [${e.dateString}] User: "${e.userText}" -> AI: "${e.aiText}" (Emotion: ${e.emotion})`
