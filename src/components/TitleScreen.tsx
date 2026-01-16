@@ -32,7 +32,7 @@ export default function TitleScreen({ onEnter }: TitleScreenProps) {
                 별의 속삭임
             </Title>
             <Text c="gray.3" size="lg" className="subtitle-text" style={{ letterSpacing: '0.1em', textAlign: 'center' }}>
-                운명을 읽는 그들의 목소리
+                당신의 하루를 밝혀주는 작은 친구들
             </Text>
 
             <Button
@@ -55,7 +55,7 @@ export default function TitleScreen({ onEnter }: TitleScreenProps) {
                     section: { marginRight: 12 }
                 }}
             >
-                운명 시작하기
+                별의 속삭임 입장하기
             </Button>
         </Stack>
     );

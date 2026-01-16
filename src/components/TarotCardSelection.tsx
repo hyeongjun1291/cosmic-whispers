@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Box, Text, SimpleGrid, Center } from '@mantine/core';
+import { Box, Text, SimpleGrid, Center, ActionIcon, Button } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TAROT_CARDS, TarotCard } from '@/lib/tarotData';
+import { IconX } from '@tabler/icons-react';
 
 interface TarotCardSelectionProps {
     onSelect: (card: TarotCard) => void;
     onCancel?: () => void;
 }
 
-export default function TarotCardSelection({ onSelect }: TarotCardSelectionProps) {
+export default function TarotCardSelection({ onSelect, onCancel }: TarotCardSelectionProps) {
     const [deck, setDeck] = useState<TarotCard[]>([]);
     const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
     const [isFlipped, setIsFlipped] = useState(false);
@@ -41,6 +42,19 @@ export default function TarotCardSelection({ onSelect }: TarotCardSelectionProps
                 perspective: '1000px'
             }}
         >
+            {/* Back Button */}
+            {!selectedCardId && onCancel && (
+                <ActionIcon
+                    variant="transparent"
+                    color="gray"
+                    size="xl"
+                    style={{ position: 'absolute', top: 20, right: 20, zIndex: 100 }}
+                    onClick={onCancel}
+                >
+                    <IconX size={32} />
+                </ActionIcon>
+            )}
+
             <AnimatePresence>
                 {!selectedCardId && (
                     <motion.div
@@ -52,7 +66,7 @@ export default function TarotCardSelection({ onSelect }: TarotCardSelectionProps
                             운명을 선택하세요. (78장 중 택1)
                         </Text>
                         <Center>
-                            <SimpleGrid cols={{ base: 6, sm: 10, md: 13 }} spacing="xs" p="md" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+                            <SimpleGrid cols={{ base: 6, sm: 10, md: 13 }} spacing="xs" p="md" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                                 {deck.map((card) => (
                                     <motion.div
                                         key={card.id}
@@ -78,6 +92,21 @@ export default function TarotCardSelection({ onSelect }: TarotCardSelectionProps
                                 ))}
                             </SimpleGrid>
                         </Center>
+
+                        {/* Bottom Back Button */}
+                        {onCancel && (
+                            <Center mt="xl">
+                                <Button
+                                    variant="subtle"
+                                    color="gray"
+                                    onClick={onCancel}
+                                    size="md"
+                                    styles={{ root: { border: '1px solid rgba(255,255,255,0.2)', '&:hover': { background: 'rgba(255,255,255,0.1)' } } }}
+                                >
+                                    뒤로 가기
+                                </Button>
+                            </Center>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>

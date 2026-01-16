@@ -4,13 +4,23 @@ import { useState } from 'react';
 import { TextInput, Button, Stack, Title, Text, Box } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IconArrowRight } from '@tabler/icons-react';
+import SajuForm from './SajuForm';
 
 interface OnboardingProps {
-    onComplete: (data: any) => void;
+    onComplete: (data: { name: string; saju: any }) => void;
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
+    const [step, setStep] = useState(1);
     const [name, setName] = useState('');
+
+    const handleNameSubmit = () => {
+        if (name) setStep(2);
+    };
+
+    const handleSajuComplete = (sajuData: any) => {
+        onComplete({ name, saju: sajuData });
+    };
 
     return (
         <Box
@@ -22,27 +32,38 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             w={{ base: '95%', sm: 'auto' }}
         >
             <AnimatePresence mode="wait">
-                <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                    <Stack gap="md">
-                        <Title order={2} fw={300} c="gold">입문을 축하드립니다.</Title>
-                        <Text size="sm" c="dimmed">먼저, 당신을 무엇이라 불러야 할지 알려주시겠습니까?</Text>
-                        <TextInput
-                            placeholder="이름을 입력하세요"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            size="md"
-                            variant="filled"
-                        />
-                        <Button
-                            rightSection={<IconArrowRight size={16} />}
-                            onClick={() => onComplete({ name })}
-                            disabled={!name}
-                            color="indigo"
-                        >
-                            다음으로
-                        </Button>
-                    </Stack>
-                </motion.div>
+                {step === 1 ? (
+                    <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                        <Stack gap="md">
+                            <Title order={2} fw={300} c="gold">반가워요! 👋</Title>
+                            <Text size="sm" c="dimmed">제가 불러드릴 이름을 알려주세요! 📝</Text>
+                            <TextInput
+                                placeholder="이름을 입력하세요"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                size="md"
+                                variant="filled"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && name) handleNameSubmit();
+                                }}
+                            />
+                            <Button
+                                rightSection={<IconArrowRight size={16} />}
+                                onClick={handleNameSubmit}
+                                disabled={!name}
+                                color="indigo"
+                                fullWidth
+                            >
+                                다음으로
+                            </Button>
+                        </Stack>
+                    </motion.div>
+                ) : (
+                    <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                        <SajuForm onComplete={handleSajuComplete} />
+                    </motion.div>
+                )}
             </AnimatePresence>
         </Box>
     );

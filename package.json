@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@astrodraw/astrochart": "^3.0.2",
     "@mantine/core": "^8.3.10",
     "@mantine/dates": "^8.3.10",
     "@mantine/form": "^8.3.10",

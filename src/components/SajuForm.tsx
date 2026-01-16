@@ -20,18 +20,18 @@ export default function SajuForm({ onComplete, onCancel }: SajuFormProps) {
     return (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <Stack gap="md">
-                <Title order={3} fw={300} c="gold" ta="center">운명의 바퀴를 맞춥니다.</Title>
-                <Text size="sm" c="dimmed" ta="center">태어난 날짜와 시간을 정확히 기록해주십시오.</Text>
+                <Title order={3} fw={300} c="gold" ta="center">내 운세 알아보기 ✨</Title>
+                <Text size="sm" c="dimmed" ta="center">정확한 분석을 위해 태어난 시간을 알려주세요!</Text>
 
                 <DatePickerInput
                     label="생년월일"
                     placeholder="날짜 선택"
                     value={formData.birthDate}
-                    onChange={(d) => setFormData({ ...formData, birthDate: d })}
+                    onChange={(d) => setFormData({ ...formData, birthDate: d as Date | null })}
                     size="md"
                     valueFormat="YYYY년 MM월 DD일"
                     styles={{ input: { fontSize: '16px' } }} // Mobile friendly
-                    inputProps={{ inputMode: 'none' }} // Prevent virtual keyboard
+
                 />
 
                 <Group gap="xs" align="flex-end">
@@ -90,7 +90,7 @@ export default function SajuForm({ onComplete, onCancel }: SajuFormProps) {
                         color="indigo"
                         flex={2}
                     >
-                        운명 확인하기
+                        운세 시작하기
                     </Button>
                 </Group>
             </Stack>

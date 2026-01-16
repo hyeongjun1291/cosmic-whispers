@@ -59,7 +59,7 @@ export function calculateSaju(
   if (isLunar) {
     // @ts-expect-error -- lunar-javascript type mismatch
     const lunar = Lunar.fromYmdHms(year, month, day, hour, minute, 0);
-    // @ts-expect-error -- lunar-javascript type mismatch
+
     if (isLeap) lunar.setLeap(true); // Assuming API supports this or input handles it
     // Note: lunar-javascript fromYmdHms default treats as non-leap. 
     // For precise lunar leap handling, use Lunar.fromYmd(...) then set leap.
@@ -198,48 +198,62 @@ export function analyzeSaju(saju: SajuData): string {
   const dayMaster = saju.day.ganji[0]; // Day Stem
   const monthBranch = saju.month.ganji[1]; // Month Branch
 
-  // 1. Day Master Traits (Nature)
+  // 1. Day Master Traits (Nature) - Translated to Korean
   const masterNature: Record<string, string> = {
-    '甲': 'straight and unbending giant tree (Big Wood)',
-    '乙': 'resilient and adaptive ivy (Small Wood)',
-    '丙': 'passionate and visible sun (Big Fire)',
-    '丁': 'warm and focused candlelight (Small Fire)',
-    '戊': 'vast and trustworthy mountain (Big Earth)',
-    '己': 'fertile and nurturing field (Small Earth)',
-    '庚': 'sharp and decisive axe (Big Metal)',
-    '辛': 'delicate and shiny jewel (Small Metal)',
-    '壬': 'fluid and wise ocean (Big Water)',
-    '癸': 'gentle and penetrating rain (Small Water)',
+    '甲': '곧게 뻗은 큰 나무 (거목)',
+    '乙': '유연하고 끈질긴 덩굴 (화초)',
+    '丙': '세상을 비추는 뜨거운 태양',
+    '丁': '따뜻하고 집중된 촛불',
+    '戊': '넓고 듬직한 큰 산',
+    '己': '비옥하고 포용력 있는 텃밭',
+    '庚': '단단하고 결단력 있는 바위/도끼',
+    '辛': '섬세하고 빛나는 보석',
+    '壬': '유유히 흐르는 큰 강물',
+    '癸': '스며드는 봄비/이슬',
   };
 
-  // 2. Element Count & Percentage
+  const dayMasterDesc = masterNature[dayMaster] || '알 수 없는 기운';
+
+  // 2. Element Count & Percentage - Korean Mapping
   const { counts, percentages } = getOhaengPercentages(saju);
+  const elNames: Record<string, string> = { '木': '나무', '火': '불', '土': '흙', '金': '쇠/금속', '水': '물' };
 
   // 3. Seasonality (Month Branch)
   let season = '';
-  if (['寅', '卯', '辰'].includes(monthBranch)) season = 'Spring (Wood)';
-  else if (['巳', '午', '未'].includes(monthBranch)) season = 'Summer (Fire)';
-  else if (['申', '酉', '戌'].includes(monthBranch)) season = 'Autumn (Metal)';
-  else if (['亥', '子', '丑'].includes(monthBranch)) season = 'Winter (Water)';
+  if (['寅', '卯', '辰'].includes(monthBranch)) season = '생동하는 봄 (나무의 계절)';
+  else if (['巳', '午', '未'].includes(monthBranch)) season = '뜨거운 여름 (불의 계절)';
+  else if (['申', '酉', '戌'].includes(monthBranch)) season = '결실의 가을 (금속의 계절)';
+  else if (['亥', '子', '丑'].includes(monthBranch)) season = '휴식의 겨울 (물의 계절)';
 
-  // 4. Missing / Excess
-  const missing = Object.entries(counts).filter(([, c]) => c === 0).map(([k]) => k);
-  const excess = Object.entries(counts).filter(([, c]) => c >= 3).map(([k]) => k);
+  // 4. Missing / Excess - Korean
+  const missing = Object.entries(counts).filter(([, c]) => c === 0).map(([k]) => elNames[k]);
+  const excess = Object.entries(counts).filter(([, c]) => c >= 3).map(([k]) => elNames[k]);
 
   // 5. Shinsal & Gilseong Analysis
   const shinsal = calculateShinsal(saju);
 
+  // Formatting Helper: Clean formatting without Hanja symbols in the final output instructions
+  const elementDist = `
+  - 나무(목): ${percentages['木']}% (${counts['木']}개)
+  - 불(화): ${percentages['火']}% (${counts['火']}개)
+  - 흙(토): ${percentages['土']}% (${counts['土']}개)
+  - 쇠(금): ${percentages['金']}% (${counts['金']}개)
+  - 물(수): ${percentages['水']}% (${counts['水']}개)
+  `;
+
   return `
-[SAJU ANALYSIS REPORT]
-1. Day Master: ${dayMaster} (${masterNature[dayMaster] || 'Unknown'})
-2. Season: Born in ${season}, influencing the Day Master's strength.
-3. Element Distribution: Wood(${counts['木']} - ${percentages['木']}%) Fire(${counts['火']} - ${percentages['火']}%) Earth(${counts['土']} - ${percentages['土']}%) Metal(${counts['金']} - ${percentages['金']}%) Water(${counts['水']} - ${percentages['水']}%)
-4. Critical Patterns:
-   - Missing Elements: ${missing.length > 0 ? missing.join(', ') : 'None (Balanced)'}
-   - Excessive Elements: ${excess.length > 0 ? excess.join(', ') : 'None'}
-5. Special Stars (Shinsal) by Pillar:
-   ${shinsal.length > 0 ? shinsal.map(s => `- [${s.pillar}] ${s.star}: ${s.description}`).join('\n   ') : '- No major stars found.'}
-   - Advice: Focus on balancing the ${excess.length > 0 ? 'excessive energy' : 'weak points'}.
+[명리학 심층 분석 데이터]
+1. 타고난 기질 (일간): 당신은 자연물로 비유하면 "${dayMasterDesc}"입니다.
+2. 태어난 계절: ${season}에 태어나, 그 기운의 영향을 받습니다.
+3. 오행 에너지 분포 (밸런스):
+${elementDist}
+4. 에너지 특징:
+   - 부족한 기운: ${missing.length > 0 ? missing.join(', ') : '없음 (골고루 갖춤)'}
+   - 과한 기운: ${excess.length > 0 ? excess.join(', ') : '없음 (안정적)'}
+5. 특수 기운 및 신살 (Divine Stars):
+   ${shinsal.length > 0 ? shinsal.map(s => `- [${s.pillar} 영향] ${s.star.split('(')[0].trim()}: ${s.description}`).join('\n   ') : '- 특별히 강한 신살은 드러나지 않았습니다. 평온한 흐름입니다.'}
+   
+   (AI 지침: 위 데이터를 바탕으로, 어려운 용어는 쓰지 말고 쉬운 우리말로 풀어서 설명할 것. 예: '역마살' -> '이동수가 많다', '도화살' -> '인기가 많다' 등)
 `;
 }
 

@@ -10,6 +10,7 @@ interface Message {
     role: 'user' | 'model';
     text: string;
     emotion?: string;
+    hidden?: boolean; // New: Support hidden context messages
 }
 
 interface VisualNovelProps {
@@ -21,6 +22,8 @@ interface VisualNovelProps {
     characterId: string;
     dashboard?: React.ReactNode;
     notifications?: Record<string, boolean>;
+    onTriggerTarot?: (topic?: string) => void;
+    onTriggerAnu?: (query: string) => void;
 }
 
 export default function VisualNovel({
@@ -31,7 +34,9 @@ export default function VisualNovel({
     characterId,
     onSwitchToCharacter,
     dashboard,
-    notifications = {}
+    notifications = {},
+    onTriggerTarot,
+    onTriggerAnu
 }: VisualNovelProps) {
     const [inputText, setInputText] = useState('');
     const lastMessage = history[history.length - 1];
@@ -56,7 +61,7 @@ export default function VisualNovel({
             .replace(/\n{3,}/g, '\n\n');
     };
 
-    const character = CHARACTERS[characterId] || CHARACTERS['cheongsan'];
+    const character = CHARACTERS[characterId] || CHARACTERS['taeil'];
 
     // Determine Logic for Image
     let currentEmotion = 'default';
@@ -105,7 +110,9 @@ export default function VisualNovel({
             <Box className="main-layout">
                 {/* Left Side - Dashboard (Desktop Only) */}
                 <Box className="dashboard-panel desktop-only">
-                    {dashboard}
+                    <ScrollArea h="100%" type="hover" offsetScrollbars>
+                        {dashboard}
+                    </ScrollArea>
                 </Box>
                 {/* Center - Character Image & Viewport Overlay */}
                 <Box className="character-panel">
@@ -195,7 +202,7 @@ export default function VisualNovel({
                         {/* Chat Messages */}
                         <ScrollArea className="chat-messages" viewportRef={scrollRef}>
                             <Stack gap="md" p="md">
-                                {history.map((msg, idx) => (
+                                {history.filter(m => !m.hidden).map((msg, idx) => (
                                     <Box
                                         key={idx}
                                         className={msg.role === 'user' ? 'message-user' : 'message-model'}
@@ -259,7 +266,18 @@ export default function VisualNovel({
                                                 color: 'var(--mantine-color-gray-5)',
                                                 backgroundColor: 'rgba(255,255,255,0.05)'
                                             }}
-                                            onClick={() => !isTyping && onSendMessage(chip.query)}
+                                            onClick={() => {
+                                                if (!isTyping) {
+                                                    // [TAROT TRIGGER]
+                                                    if (characterId === 'claire' && onTriggerTarot) {
+                                                        onTriggerTarot(chip.query); // Pass full query
+                                                    } else if (characterId === 'anu' && onTriggerAnu) {
+                                                        onTriggerAnu(chip.query);
+                                                    } else {
+                                                        onSendMessage(chip.query);
+                                                    }
+                                                }
+                                            }}
                                         >
                                             {chip.label}
                                         </Badge>
@@ -298,11 +316,13 @@ export default function VisualNovel({
                     history={history}
                     character={character}
                     userName={userName}
-                    inputText={inputText}
-                    setInputText={setInputText}
-                    handleSend={handleSend}
+                    onSend={onSendMessage}
                     isTyping={isTyping}
+                    lastMessage={lastMessage}
                     formatText={formatText}
+                    onTriggerTarot={onTriggerTarot}
+                    onTriggerAnu={onTriggerAnu}
+                    characterId={characterId}
                 />
             </Box>
         </Box >
@@ -317,7 +337,10 @@ function MobileChatOverlay({
     isTyping,
     lastMessage,
     formatText,
-    userName
+    userName,
+    onTriggerTarot,
+    onTriggerAnu,
+    characterId
 }: {
     history: Message[];
     character: any;
@@ -326,6 +349,9 @@ function MobileChatOverlay({
     lastMessage: Message | undefined;
     formatText: (text: string) => string;
     userName: string;
+    onTriggerTarot?: (topic?: string) => void;
+    onTriggerAnu?: (query: string) => void;
+    characterId?: string;
 }) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
@@ -446,7 +472,7 @@ function MobileChatOverlay({
                                             {history.length}개
                                         </Text>
                                     </Group>
-                                    {history.map((msg: any, idx: number) => (
+                                    {history.filter(m => !m.hidden).map((msg: any, idx: number) => (
                                         <Box
                                             key={idx}
                                             className={msg.role === 'user' ? 'message-user' : 'message-model'}
@@ -538,7 +564,18 @@ function MobileChatOverlay({
                                                 color: 'var(--mantine-color-gray-3)',
                                                 backgroundColor: 'rgba(0,0,0,0.2)'
                                             }}
-                                            onClick={() => !isTyping && handleSendMessage(chip.query)}
+                                            onClick={() => {
+                                                if (!isTyping) {
+                                                    // [TAROT TRIGGER]
+                                                    if (character.id === 'claire' && onTriggerTarot) { // Use character.id from prop
+                                                        onTriggerTarot(chip.query); // Pass full query
+                                                    } else if (character.id === 'anu' && onTriggerAnu) {
+                                                        onTriggerAnu(chip.query);
+                                                    } else {
+                                                        handleSendMessage(chip.query);
+                                                    }
+                                                }
+                                            }}
                                         >
                                             {chip.label}
                                         </Badge>
@@ -572,6 +609,6 @@ function MobileChatOverlay({
                     </>
                 )}
             </motion.div>
-        </Box>
+        </Box >
     );
 }

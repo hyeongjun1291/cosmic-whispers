@@ -3,12 +3,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { calculateSaju, SajuData, analyzeSaju } from '@/lib/saju';
 import { generateCharacterResponse } from '@/lib/groq';
+// Import I Ching Logic
+import { castIChing, MeihuaResult } from '@/lib/iching';
+// Import Shaman/Obanggi Logic
+import { ShamanResult } from '@/lib/shaman';
 import Onboarding from '@/components/Onboarding';
 import SajuForm from '@/components/SajuForm';
 import TarotCardSelection from '@/components/TarotCardSelection';
+// import ObanggiSelection from '@/components/ObanggiSelection'; // [NEW] Hwari Engine - Removed
+import { weighSoul, SoulWeight } from '@/lib/egypt'; // [NEW] Anu Engine
 import PungryuGate from '@/components/PungryuGate';
 import VisualNovel from '@/components/VisualNovel';
 import SajuDashboard from '@/components/SajuDashboard';
+import WesternChartDashboard from '@/components/WesternChartDashboard';
+// Import I Ching Dashboard
+import IChingDashboard from '@/components/IChingDashboard';
+import AnuSoulScale, { AnuSoulScaleRef } from '@/components/AnuSoulScale'; // [NEW] Anu Engine
+import HwariCheeringKit from '@/components/HwariCheeringKit'; // [NEW] Hwari Engine
 import SettingsModal from '@/components/SettingsModal';
 import CharacterSelection from '@/components/CharacterSelection';
 // Removed Talisman Import
@@ -17,32 +28,26 @@ import { saveEpisode, getRelevantEpisodes } from '@/lib/memory';
 import { CHARACTERS } from '@/lib/characters';
 import { Box, Drawer, ActionIcon, Modal, Text, Group, Stack } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconLayoutDashboard } from '@tabler/icons-react';
+import { IconLayoutDashboard, IconSettings } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { Turnstile, TurnstileInstance } from '@marsidev/react-turnstile';
 import { notifications as mantineNotifications } from '@mantine/notifications';
 
 export default function Home() {
-  const [userData, setUserData] = useState<any>(null); // Revert session check
+  const [userData, setUserData] = useState<any>(null);
   const [saju, setSaju] = useState<SajuData | null>(null);
+  const [sajuInput, setSajuInput] = useState<any>(null); // New: Store raw input for Natal Chart
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [history, setHistory] = useState<any[]>([]);
-  // const [apiKey, setApiKey] = useState(process.env.NEXT_PUBLIC_GROQ_API_KEY || ''); // Not used on client anymore
+  const [chatHistories, setChatHistories] = useState<Record<string, any[]>>({}); // Persist per character
   const [isTyping, setIsTyping] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [showTitle, setShowTitle] = useState(true); // Restored
+  const [showTitle, setShowTitle] = useState(true);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const turnstileRef = useRef<TurnstileInstance>(null);
 
-  // Existing Modals & State
-  const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
-  // Dashboard drawer is still used for mobile
-  const [dashboardOpened, { toggle: toggleDashboard }] = useDisclosure(false);
-  const [sajuModalOpened, { open: openSajuModal, close: closeSajuModal }] = useDisclosure(false);
-  const [pendingCharacterId, setPendingCharacterId] = useState<string | null>(null);
-  const [tarotModalOpened, { open: openTarotModal, close: closeTarotModal }] = useDisclosure(false);
-  const [pungryuModalOpened, { open: openPungryuModal, close: closePungryuModal }] = useDisclosure(false);
-  const [selectedCard, setSelectedCard] = useState<any>(null);
+  // Feature State: I Ching
+  const [ichingResult, setIchingResult] = useState<MeihuaResult | null>(null);
 
   // New Alert/Confirm Modals
   const [changeCharModalOpened, { open: openChangeCharModal, close: closeChangeCharModal }] = useDisclosure(false);
@@ -56,351 +61,483 @@ export default function Home() {
 
   useEffect(() => {
     setIsInitialized(true);
-    // Load persisted data
-    const savedUser = localStorage.getItem('cosmic_user');
-    const savedHistory = localStorage.getItem('cosmic_history');
-    const savedChar = localStorage.getItem('cosmic_character');
-    const savedAffection = localStorage.getItem('cosmic_affection');
 
-    if (savedUser) setUserData(JSON.parse(savedUser));
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
+    // USER REQUEST: Unconditionally ask for Name/DOB on refresh.
+    // Therefore, we CLEAR all persisted data on mount.
+    localStorage.removeItem('cosmic_user');
+    localStorage.removeItem('cosmic_saju_input');
+    localStorage.removeItem('cosmic_user');
+    localStorage.removeItem('cosmic_saju_input');
+    localStorage.removeItem('cosmic_history');
+    localStorage.removeItem('cosmic_chat_histories');
+
+    setUserData(null);
+    setSajuInput(null);
+    setHistory([]);
+
+    // Always start at Title
+    setCharacterId(null);
   }, []);
 
-  // Removed apiKey local storage logic as it's server-side now
+  const calculateAndSetSaju = (input: any) => {
+    try {
+      if (!input || !input.birthDate) return null;
 
-  const handleOnboardingComplete = (data: any) => {
-    setUserData(data);
-    localStorage.setItem('cosmic_user', JSON.stringify(data));
+      const date = new Date(input.birthDate);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+
+      let hour = 12; // Default if unknown
+      let minute = 0;
+      let isTimeUnknown = false;
+
+      if (input.birthTime === 'unknown') {
+        isTimeUnknown = true;
+      } else if (input.birthTime) {
+        const parts = input.birthTime.split(':');
+        if (parts.length === 2) {
+          hour = parseInt(parts[0], 10);
+          minute = parseInt(parts[1], 10);
+        }
+      }
+
+      const isLunar = input.calendarType === 'lunar';
+      const isLeap = input.isLeap === 'true';
+
+      const sajuResult = calculateSaju(
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        isLunar,
+        isLeap,
+        isTimeUnknown
+      );
+
+      return sajuResult;
+    } catch (e) {
+      console.error("Failed to calculate Saju:", e);
+      return null;
+    }
   };
 
-  const calculateAndSetSaju = (data: any) => {
-    const calculated = calculateSaju(
-      dayjs(data.birthDate).year(),
-      dayjs(data.birthDate).month() + 1,
-      dayjs(data.birthDate).date(),
-      (() => {
-        if (data.birthTime === 'unknown') return 12;
-        const timeStr = data.birthTime.replace(':', '');
-        let h = 0;
-        if (timeStr.length === 4) h = parseInt(timeStr.substring(0, 2));
-        else if (data.birthTime.includes(':')) h = parseInt(data.birthTime.split(':')[0]);
-        else h = parseInt(data.birthTime);
-        return isNaN(h) ? 0 : h;
-      })(),
-      (() => {
-        if (data.birthTime === 'unknown') return 0;
-        const timeStr = data.birthTime.replace(':', '');
-        let m = 0;
-        if (timeStr.length === 4) m = parseInt(timeStr.substring(2, 4));
-        else if (data.birthTime.includes(':') && data.birthTime.split(':')[1]) m = parseInt(data.birthTime.split(':')[1]);
-        return isNaN(m) ? 0 : m;
-      })(),
-      data.calendarType === 'lunar',
-      data.isLeap === 'true',
-      data.birthTime === 'unknown'
-    );
-    setSaju(calculated);
-    return calculated;
+  const handleOnboardingComplete = (data: { name: string, saju: any }) => {
+    setUserData({ name: data.name });
+    localStorage.setItem('cosmic_user', JSON.stringify({ name: data.name }));
+
+    if (data.saju) {
+      setSajuInput(data.saju);
+      localStorage.setItem('cosmic_saju_input', JSON.stringify(data.saju));
+
+      // Calculate and Set Saju State
+      const calculated = calculateAndSetSaju(data.saju);
+      console.log("Onboarding Saju Calculated:", calculated);
+      setSaju(calculated);
+    }
   };
 
+  // ... (down to DashboardContent)
+
+  const [dashboardOpened, { toggle: toggleDashboard }] = useDisclosure(false);
+  // Optional: Settings modal state if needed, assuming user had it
+  const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
+  const [notifications, setNotifications] = useState<Record<string, boolean>>({});
+
+  // Modal States
+  const [sajuModalOpened, { open: openSajuModal, close: closeSajuModal }] = useDisclosure(false);
+  const [tarotModalOpened, { open: openTarotModal, close: closeTarotModal }] = useDisclosure(false);
+  const [pungryuModalOpened, { open: openPungryuModal, close: closePungryuModal }] = useDisclosure(false);
+
+  // State for specific features
+  const [selectedCard, setSelectedCard] = useState<any>(null); // For Tarot
+  const [tarotTopic, setTarotTopic] = useState<string>(''); // For Tarot Context
+  // const [obanggiModalOpened, setObanggiModalOpened] = useState(false); // [NEW] Hwari - Removed
+  const [obanggiResult, setObanggiResult] = useState<any>(null); // [NEW] Hwari
+  const [soulResult, setSoulResult] = useState<SoulWeight | null>(null); // [NEW] Anu
+
+  // Ref for Anu Scale
+  const anuScaleRef = useRef<AnuSoulScaleRef>(null);
+
+  // Feature Handlers
   const handleSajuComplete = (data: any) => {
+    // Taeil's specific Saju update (re-calc or update existing)
     const calculated = calculateAndSetSaju(data);
     setSaju(calculated);
+    setSajuInput(data); // Sync main input
+    localStorage.setItem('cosmic_saju_input', JSON.stringify(data));
     closeSajuModal();
-
-    // Proceed to chat with pending character (Cheongsan)
-    if (pendingCharacterId) {
-      setCharacterId(pendingCharacterId);
-      localStorage.setItem('cosmic_character', pendingCharacterId);
-      const char = CHARACTERS[pendingCharacterId];
-      const newHistory = [{ role: 'model', text: char.greeting, emotion: 'default' }];
-      setHistory(newHistory);
-      localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
-      setPendingCharacterId(null);
-    }
   };
 
   const handleTarotComplete = (card: any) => {
     setSelectedCard(card);
     closeTarotModal();
 
-    if (pendingCharacterId) {
-      setCharacterId(pendingCharacterId);
-      localStorage.setItem('cosmic_character', pendingCharacterId);
-      initializeZionChat(pendingCharacterId, card);
-      setPendingCharacterId(null);
-    }
+    // Trigger Tarot interpretation immediately
+    // Simulate user asking about the card they just picked
+    // Use a small timeout to allow modal to close smoothly
+    // [USER REQUEST] Localize to Korean AND Include Topic Context
+    setTimeout(() => {
+      // If there's a specific topic/query from a chip, use it ONE-SHOT with the card context.
+      // Otherwise, fall back to the generic "interpret this card" request.
+      let fullMessage = `'${card.name}' 카드를 뽑았어. 이 카드가 내 상황에 어떤 의미가 있는지 해석해줘.`;
+
+      if (tarotTopic) {
+        // Combine query and card info naturally
+        fullMessage = `"${tarotTopic}" (이 질문에 대해)\n\n'${card.name}' 카드를 뽑았어. 이 카드를 바탕으로 위 질문에 대한 운세를 해석해줘.`;
+      }
+
+      handleSendMessage(fullMessage);
+      setTarotTopic(''); // Reset after sending
+    }, 500);
   };
 
-  const initializeZionChat = async (charId: string, card: any) => {
+  // [NEW] Hwari Handler - Removed
+
+  const handleHwajuEnter = () => {
+    // Pungryu Hwaju logic
+    closePungryuModal();
+    // Maybe set some Pungryu specific state
+  };
+
+  // [NEW] Anu Handler
+  const handleSoulReference = async (result: SoulWeight) => {
+    setSoulResult(result);
+    // Trigger Anu's reaction with HIDDEN context
+    // We manually construct the history with a hidden user message
+    const hiddenUserMsg = {
+      role: 'user',
+      text: `(내 영혼의 무게: ${result.mg}mg, 판정: ${result.verdict})\n\n${result.reaction}\n\n이 결과에 대해 어떻게 생각해?`,
+      timestamp: new Date(),
+      hidden: true // [NEW] Flag to hide from UI
+    };
+
+    const newHistory = [...history, hiddenUserMsg];
+    // Don't update state with this immediately if we want to look seamless, 
+    // BUT we need it in history for the API to see it.
+    // The VisualNovel component will filter it out based on 'hidden: true'
+    setHistory(newHistory);
     setIsTyping(true);
-    setHistory([]); // Clear history
 
     try {
-      // Construct a special prompt for the first message
-      const cardContext = `User drew the Tarot card: ${card.name}.\nMeaning: ${card.meaning}\n\nInterpret this card for the user as your first greeting.`;
-
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: "행운의 카드를 뽑았습니다. 해석해주세요.",
-          characterId: charId,
-          userName: userData?.name || 'User',
-          context: cardContext,
-          history: [],
-          turnstileToken // Send token
+          history: newHistory,
+          characterId: 'anu',
+          userName: userData?.name,
+          soulResult: result, // Pass result explicitly just in case
+          turnstileToken: turnstileToken
         })
       });
 
-      if (res.status === 429) {
-        setAlertMessage('하루 대화 가능 횟수(20회)를 초과했습니다. 내일 다시 와주세요!');
-        openAlertModal();
-        setHistory([{ role: 'model', text: "오늘의 인연은 여기까지인 것 같군요. 내일 다시 만나요.", emotion: 'default' }]);
-        return;
-      }
+      const textBody = await res.text();
+      let data;
+      try { data = JSON.parse(textBody); } catch (e) { throw new Error(textBody); }
 
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error(`Chat API Error: ${res.status} ${res.statusText}`, errText);
-        throw new Error(`Chat API Error: ${res.status} - ${errText}`);
-      }
+      if (!res.ok) throw new Error(data.error || 'Server Error');
 
-      const response = await res.json();
-      const newHistory = [{ role: 'model', text: response.text, emotion: response.emotion }];
-      setHistory(newHistory);
-      localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
+      const aiMsg = {
+        role: 'model',
+        text: data.text,
+        emotion: data.emotion,
+        timestamp: new Date()
+      };
+
+      setHistory([...newHistory, aiMsg]);
+      localStorage.setItem('cosmic_history', JSON.stringify([...newHistory, aiMsg]));
+
     } catch (e) {
       console.error(e);
-      setHistory([{ role: 'model', text: "카드의 기운이 너무 강해 읽을 수가 없군요... 다시 시도해주세요.", emotion: 'default' }]);
+      mantineNotifications.show({ title: '오류', message: '아누의 목소리를 듣지 못했습니다.', color: 'red' });
     } finally {
       setIsTyping(false);
     }
   };
 
-  const handlePungryuEnter = () => {
-    closePungryuModal();
-    if (pendingCharacterId) {
-      setCharacterId(pendingCharacterId);
-      localStorage.setItem('cosmic_character', pendingCharacterId);
-      const char = CHARACTERS[pendingCharacterId];
-      const newHistory = [{ role: 'model', text: char.greeting, emotion: 'default' }];
-      setHistory(newHistory);
-      localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
-      setPendingCharacterId(null);
-    }
-  };
+  // [NEW] Hwari Cheering Handler
+  const handleHwariCheer = async (result: ShamanResult) => {
+    setObanggiResult(result);
 
-  const msgCountRef = useRef(0);
-  const [notifications, setNotifications] = useState<Record<string, boolean>>({});
+    const hiddenUserMsg = {
+      role: 'user',
+      text: `[오방기 결과: ${result.flagName}]\n의미: ${result.meaning}\n\n화리야, 이 점괘를 아이돌 팬싸인회 느낌으로 해석해줘!`,
+      timestamp: new Date(),
+      hidden: true
+    };
 
-  const handleCharacterSelect = (id: string) => {
-    // Clear notification if exists
-    if (notifications[id]) {
-      setNotifications(prev => ({ ...prev, [id]: false }));
-    }
-
-    if (id === 'cheongsan' && !saju) {
-      setPendingCharacterId(id);
-      openSajuModal();
-    } else if (id === 'zion') {
-      setPendingCharacterId(id);
-      openTarotModal();
-    } else if (id === 'pungryu') {
-      setPendingCharacterId(id);
-      openPungryuModal();
-    } else {
-      setCharacterId(id);
-      localStorage.setItem('cosmic_character', id);
-      const char = CHARACTERS[id];
-      const newHistory = [{ role: 'model', text: char.greeting, emotion: 'default' }];
-      setHistory(newHistory);
-      localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
-    }
-  };
-
-  const [lastVisit, setLastVisit] = useState<number>(0);
-
-  // Proactive Agency: Check last visit & Greet
-  useEffect(() => {
-    // ... existing proactive logic ...
-  }, [characterId]);
-
-
-  const handleSendMessage = async (text: string) => {
-    // 1. Cross-Character Notification Logic
-    // 1. Cross-Character Notification Logic
-    msgCountRef.current += 1;
-    if (msgCountRef.current >= 10 && characterId) {
-      // Trigger notification from random OTHER character
-      const others = Object.keys(CHARACTERS).filter(id => id !== characterId);
-      if (others.length > 0) {
-        const randomTarget = others[Math.floor(Math.random() * others.length)];
-        console.log(`[Agency] Notification triggered from ${randomTarget} after 10 messages`);
-
-        // Exclusive notification: Clear others, set only new one
-        setNotifications({ [randomTarget]: true });
-
-        // define messages
-        const NOTIFICATION_MESSAGES: Record<string, string> = {
-          cheongsan: "운명의 흐름이 당신을 부르고 있습니다... 잠시 저와 이야기하시겠습니까?",
-          pungryu: "어이, 너무 그쪽만 편애하는 거 아니야? 나랑도 좀 놀자고!",
-          heukyeong: "계속 그 자만 바라볼 셈인가? 내 인내심을 시험하지 마라.",
-          zion: "운명의 카드가 새로운 메시지를 속삭이고 있어요. 확인해보시겠어요?",
-        };
-
-        mantineNotifications.show({
-          title: `${CHARACTERS[randomTarget].name}의 메시지`,
-          message: NOTIFICATION_MESSAGES[randomTarget] || "새로운 알림이 도착했습니다.",
-          color: CHARACTERS[randomTarget].color,
-          icon: <img
-            src={`/images/ui/nav_${randomTarget}.png`}
-            style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }}
-            onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/20'; }}
-          />,
-          autoClose: 7000,
-          withBorder: true,
-          styles: {
-            root: {
-              backgroundColor: 'rgba(20, 20, 30, 0.95)',
-              borderColor: CHARACTERS[randomTarget].color
-            },
-            title: { color: CHARACTERS[randomTarget].color, fontWeight: 700 },
-            description: { color: 'white' }
-          }
-        });
-      }
-      msgCountRef.current = 0; // Reset count
-    }
-
-    // Update visit time
-    localStorage.setItem('cosmic_last_visit', Date.now().toString());
-
-    console.log('[Client] Sending message, token:', turnstileToken ? turnstileToken.substring(0, 20) + '...' : 'EMPTY');
-
-    const newHistory = [...history, { role: 'user', text }];
+    const newHistory = [...history, hiddenUserMsg];
     setHistory(newHistory);
-    localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
     setIsTyping(true);
 
     try {
-      // If character is Zion, use selected Card as context if available
-      let context = '';
-      if (characterId === 'cheongsan' && saju) {
-        const basicInfo = `${saju.year.ganji}년 ${saju.month.ganji}월 ${saju.day.ganji}일 ${saju.time ? saju.time.ganji + '시생' : '생시 모름'} (${saju.day.sibsin}격)`;
-        const analysis = analyzeSaju(saju);
-        context = `${basicInfo}\n${analysis}`;
-      } else if (characterId === 'zion' && selectedCard) {
-        context = `Selected Tarot Card: ${selectedCard.name}\nMeaning: ${selectedCard.meaning}`;
-      }
-
-      // Context Injection (Memory)
-      const memories = getRelevantEpisodes(3);
-      if (memories) {
-        context += `\n\n[PAST MEMORIES]\n${memories}`;
-      }
-
-
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: text,
-          characterId: characterId || 'cheongsan',
-          userName: userData?.name || 'User',
-          context,
-          history,
-          turnstileToken // Send token
+          history: newHistory,
+          characterId: 'hwaju',
+          userName: userData?.name,
+          obanggiResult: result,
+          turnstileToken: turnstileToken
         })
       });
 
-      if (res.status === 429) {
-        setAlertMessage('하루 대화 가능 횟수(20회)를 초과했습니다. 내일 다시 와주세요!');
-        openAlertModal();
-        const limitHistory = [...newHistory, { role: 'model', text: "오늘의 대화 에너지가 소진되었습니다. 내일 다시 만나요.", emotion: 'default' }];
-        setHistory(limitHistory);
-        localStorage.setItem('cosmic_history', JSON.stringify(limitHistory));
-        return;
-      }
+      const textBody = await res.text();
+      let data;
+      try { data = JSON.parse(textBody); } catch (e) { throw new Error(textBody); }
 
-      const response = await res.json();
-      const updatedHistory = [...newHistory, { role: 'model', text: response.text, emotion: response.emotion }];
-      setHistory(updatedHistory);
-      localStorage.setItem('cosmic_history', JSON.stringify(updatedHistory));
+      if (!res.ok) throw new Error(data.error || 'Server Error');
 
-      // Save Episode if significant (Just save all or based on length?) - Simplifying to just save last interaction occasionally or relying on history.
-      // Actually, removing saveEpisode for now as it relied on 'delta', or I will update it in next step.
-      // For now, let's keep history only.
+      const aiMsg = {
+        role: 'model',
+        text: data.text,
+        emotion: data.emotion,
+        thought: data.thought,
+        timestamp: new Date()
+      };
 
-    } catch (error) {
-      console.error(error);
-      setHistory([...newHistory, { role: 'model', text: "운명의 흐름에 일시적인 장애가 발생했군요.", emotion: 'frust' }]);
+      setHistory([...newHistory, aiMsg]);
+      localStorage.setItem('cosmic_history', JSON.stringify([...newHistory, aiMsg]));
+
+    } catch (e) {
+      console.error(e);
+      mantineNotifications.show({ title: '오류', message: '화리의 응원을 받지 못했습니다.', color: 'red' });
     } finally {
       setIsTyping(false);
     }
   };
 
-  const handleReset = () => {
-    setConfirmConfig({
-      title: '데이터 초기화',
-      message: '정말로 모든 데이터를 삭제하고 처음으로 돌아가시겠습니까?',
-      action: () => {
-        localStorage.removeItem('cosmic_user');
-        localStorage.removeItem('cosmic_history');
-        localStorage.removeItem('cosmic_character');
-        localStorage.removeItem('cosmic_affection');
-        setUserData(null);
-        setSaju(null);
-        setHistory([]);
-        setCharacterId(null);
-        setSelectedCard(null);
-        setCharacterId(null);
-        setSelectedCard(null);
-        closeSettings();
-        closeConfirmModal();
+  // [NEW] Anu Quick Action Handler
+  const handleAnuQuickAction = (text: string) => {
+    // Auto-switch to Anu if not already (should be handled by UI context, but safe guard)
+    if (characterId !== 'anu') setCharacterId('anu');
+
+    // Call imperative handle
+    setTimeout(() => {
+      if (anuScaleRef.current) {
+        anuScaleRef.current.autoWeigh(text);
       }
-    });
-    openConfirmModal();
+    }, 100);
   };
 
-  const handleChangeCharacterRequest = () => {
-    openChangeCharModal();
+  // Helper for Tarot trigger from chips
+  const handleDetailedTarotRequest = (topic: string) => {
+    if (topic) setTarotTopic(topic);
+    openTarotModal();
   };
+
+  // Utility for Reset
+  const handleReset = () => {
+    localStorage.clear();
+    location.reload();
+  };
+
+  // Missing Modals Logic (Saju/Tarot/Pungryu specific inputs)
+  // Simplified for now to just allow entry. 
 
   const confirmChangeCharacter = () => {
     if (emailOptIn) {
-      console.log(`[Email Opt-in] User opted in from Char Switch: ${emailOptIn}`);
-      // In real app, post to API here
+      // Save email logic here
     }
-
     if (clearHistoryOnSwitch) {
       setHistory([]);
       localStorage.removeItem('cosmic_history');
-      setSelectedCard(null);
     }
     setCharacterId(null);
-    localStorage.removeItem('cosmic_character');
     closeChangeCharModal();
   };
 
-  if (!isInitialized) return null;
+  const handleCharacterSelect = (id: string) => {
+    // 1. Save Current History to State Map
+    if (characterId) {
+      setChatHistories(prev => ({
+        ...prev,
+        [characterId]: history
+      }));
+    }
 
-  // Title Screen
+    // 2. Load New History from State Map (if exists)
+    // We access chatHistories directly. Note: In this render cycle, chatHistories[id] is clean because we assume we are switching to a DIFFERENT id.
+    const savedHistory = chatHistories[id];
 
-  // Title Screen logic integrated into main return to ensure Turnstile is always mounted
+    if (savedHistory && savedHistory.length > 0) {
+      setHistory(savedHistory);
+      setCharacterId(id);
+      // Skip greeting injection since we have history
+      return;
+    }
 
+    // If no history, Initialize:
+    setHistory([]);
+    // localStorage.removeItem('cosmic_history'); // No longer needed as we manage in memory during session
 
-  // If authenticated (implicit via Turnstile existence)
-  // ... continue to Game flow
+    // 3. Inject New Character Greeting
+    // @ts-ignore
+    const char = CHARACTERS[id];
+    if (char && id !== 'hwaju') {
+      const greetingMsg = {
+        role: 'model',
+        text: char.greeting,
+        emotion: 'default',
+        timestamp: new Date()
+      };
+      setHistory([greetingMsg]);
+    }
 
+    // For Hwari, we can have greeting AND a modal.
+    if (id === 'hwaju') {
+      // Maybe inject greeting FIRST, then modal.
+      const greetingMsg = {
+        role: 'model',
+        text: CHARACTERS['hwaju'].greeting,
+        emotion: 'default',
+        timestamp: new Date()
+      };
+      setHistory([greetingMsg]);
+    }
+
+    setCharacterId(id);
+
+    // 3. Trigger Modals/Calculations if Data Missing or Feature Required
+    // [USER REQUEST] Remove auto-trigger for Tarot. Only manual trigger via Chips.
+    // if (id === 'claire' && !selectedCard) {
+    //   setTimeout(() => openTarotModal(), 500);
+    // }
+
+    // I Ching for Ryungi
+    if (id === 'hyeonryeong') {
+      const result = castIChing();
+      setIchingResult(result);
+      // Ryungi logic is auto-calculated time-based, so just setting state is enough.
+      // The API will pick it up on next message.
+    }
+
+    // [NEW] Obanggi for Hwari (Manual Trigger) - Removed auto trigger
+
+    // [NEW] Soul Weighing for Anu (Auto Trigger) - REMOVED Auto Trigger (Handled in Component)
+    if (id === 'anu') {
+      // Just clear result, let component handle interaction
+      setSoulResult(null);
+    }
+  };
+
+  const handleSendMessage = async (input: string) => {
+    if (!input.trim() || isTyping) return;
+
+    // Optimistic update
+    const userMsg = { role: 'user', text: input, timestamp: new Date() };
+    const newHistory = [...history, userMsg];
+    setHistory(newHistory);
+    setIsTyping(true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          history: newHistory,
+          characterId,
+          userName: userData?.name,
+          saju: saju, // Keep saju for Taei
+          sajuInput: sajuInput,
+          ichingResult: characterId === 'hyeonryeong' ? ichingResult : null, // [NEW] Pass Ryungi Data
+          obanggiResult: characterId === 'hwaju' ? obanggiResult : null,    // [NEW] Pass Hwari Data
+          soulResult: characterId === 'anu' ? soulResult : null,             // [NEW] Pass Anu Data
+          turnstileToken: turnstileToken // Fix: Pass token for validation
+        })
+      });
+
+      const textBody = await res.text();
+      let data;
+      try {
+        data = JSON.parse(textBody);
+      } catch (err) {
+        console.error("Non-JSON API Response:", textBody);
+        throw new Error(`Server Error (${res.status}): ${textBody.slice(0, 100)}...`);
+      }
+
+      if (!res.ok) {
+        console.error(`Server API Error (${res.status}):`, data);
+        // Handle specific Groq errors
+        if (data.details?.includes("GROQ_QUOTA")) {
+          throw new Error("⚠️ AI 이용량이 초과되었습니다. (내일 다시 시도해주세요)");
+        }
+        // Show actual server detail for debugging
+        throw new Error(data.details || data.error || `Server Error ${res.status}`);
+      }
+
+      const aiMsg = {
+        role: 'model', // Fixed: was 'assistant'
+        text: data.text, // Fixed: was 'content'
+        emotion: data.emotion,
+        thought: data.thought,
+        timestamp: new Date()
+      };
+
+      const finalHistory = [...newHistory, aiMsg];
+      setHistory(finalHistory);
+      localStorage.setItem('cosmic_history', JSON.stringify(finalHistory));
+
+    } catch (e) {
+      console.error(e);
+      mantineNotifications.show({
+        title: '오류',
+        message: '메시지 전송 실패',
+        color: 'red'
+      });
+    } finally {
+      setIsTyping(false);
+    }
+  };
 
   // Dashboard Content Reuse
   const DashboardContent = (
     <>
-      <Text size="xl" fw={700} c="gold" mb="md">{characterId === 'zion' ? "당신의 타로 카드" : "당신의 운명 원국"}</Text>
-      {characterId === 'cheongsan' && (saju ? <SajuDashboard data={saju} /> : <Box p="md">사주 정보가 없습니다.</Box>)}
-      {characterId === 'zion' && (selectedCard ? (
+      <Text size="xl" fw={700} c="gold" mb="md">
+        {characterId === 'claire' ? "나의 타로 카드" :
+          characterId === 'selene' ? "나의 천궁도" :
+            characterId === 'hyeonryeong' ? "매화역수 괘상" : // Title for Ryungi
+              "나의 사주 분석표"}
+      </Text>
+
+      {/* Saju Dashboard (Default: Taeil ONLY) */}
+      {characterId === 'taeil' && (
+        saju ? <SajuDashboard data={saju} /> : <Box p="md">사주 정보가 없습니다.</Box>
+      )}
+
+      {/* Hwari Cheering Kit */}
+      {characterId === 'hwaju' && (
+        <HwariCheeringKit
+          userName={userData?.name || 'User'}
+          existingResult={obanggiResult}
+          onCheer={handleHwariCheer}
+        />
+      )}
+
+      {/* I Ching Dashboard (Ryungi) */}
+      {characterId === 'hyeonryeong' && (
+        ichingResult ? <IChingDashboard data={ichingResult} /> : <Box p="md">괘상을 뽑는 중...</Box>
+      )}
+
+      {/* Western Chart (Selene) */}
+      {characterId === 'selene' && (
+        sajuInput?.birthDate ? <WesternChartDashboard birthDate={sajuInput.birthDate} /> : <Box p="md" c="dimmed">운명 데이터(생년월일)가 필요합니다.</Box>
+      )}
+
+      {/* Anu Soul Scale */}
+      {characterId === 'anu' && (
+        <AnuSoulScale
+          ref={anuScaleRef}
+          userName={userData?.name || 'User'}
+          onReference={handleSoulReference}
+        />
+      )}
+
+      {/* Tarot Card (Claire) */}
+      {characterId === 'claire' && (selectedCard ? (
         <Box p="md" ta="center">
           <img
             src={selectedCard.image}
@@ -416,7 +553,7 @@ export default function Home() {
           <Text size="xl" fw={700} c="gold">{selectedCard.name}</Text>
           <Text size="sm" mt="md">{selectedCard.meaning.split('/')[1]}</Text>
         </Box>
-      ) : <Box p="md">선택된 카드가 없습니다.</Box>)}
+      ) : <Box p="md" c="dimmed">아직 카드를 뽑지 않았습니다.</Box>)}
     </>
   );
 
@@ -445,6 +582,22 @@ export default function Home() {
         </Box>
       ) : null}
 
+      {/* Global Settings Button - Always visible if not in Title/Onboarding for now */}
+      {!showTitle && (
+        <ActionIcon
+          variant="transparent"
+          color="gray"
+          size="lg"
+          pos="absolute"
+          top={20}
+          right={20}
+          style={{ zIndex: 1000 }}
+          onClick={openSettings}
+        >
+          <IconSettings />
+        </ActionIcon>
+      )}
+
       {showTitle ? (
         <TitleScreen onEnter={() => setShowTitle(false)} />
       ) : (
@@ -465,9 +618,9 @@ export default function Home() {
             </Group>
           </Modal>
 
-          <Modal opened={changeCharModalOpened} onClose={closeChangeCharModal} title="대화 상대 변경" centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
+          <Modal opened={changeCharModalOpened} onClose={closeChangeCharModal} title="친구 목록으로 가기" centered overlayProps={{ blur: 3 }} styles={{ content: { background: 'rgba(30, 35, 50, 0.95)', border: '1px solid gold' } }}>
             <Stack gap="md">
-              <Text>대화 상대를 변경하시겠습니까?</Text>
+              <Text>다른 친구와 이야기를 나눠볼까요? 😊</Text>
               <Stack gap="sm">
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}>
                   <input type="checkbox" checked={clearHistoryOnSwitch} onChange={(e) => setClearHistoryOnSwitch(e.target.checked)} />
@@ -506,20 +659,18 @@ export default function Home() {
           ) : (
             <>
               <VisualNovel
-                userName={userData.name}
+                userName={userData?.name || 'User'}
                 history={history}
                 onSendMessage={handleSendMessage}
                 isTyping={isTyping}
                 characterId={characterId}
-                onSwitchToCharacter={(id) => {
-                  if (id === characterId) return;
-                  // Directly switch, handling prerequisites via existing handler logic if needed, 
-                  // or just set ID if we assume prerequisites (like Saju) are global.
-                  // Use handleCharacterSelect to be safe (it checks Saju/Tarot existence).
-                  handleCharacterSelect(id);
-                }}
+                onSwitchToCharacter={handleCharacterSelect}
                 dashboard={DashboardContent}
                 notifications={notifications}
+                onTriggerTarot={(topic) => {
+                  if (topic) setTarotTopic(topic);
+                  openTarotModal();
+                }}
               />
 
               {/* Mobile Only Dashboard Button and Drawer */}
@@ -537,14 +688,14 @@ export default function Home() {
                 <Drawer
                   opened={dashboardOpened}
                   onClose={toggleDashboard}
-                  title={characterId === 'zion' ? "당신의 타로 카드" : "당신의 운명 원국"}
+                  title={characterId === 'claire' ? "나의 타로 카드" : "나의 사주 분석표"}
                   position="left"
                   size="md"
                   styles={{ content: { background: 'var(--background)', color: 'white' } }}
                 >
                   {/* Character Navigation - Mobile Dashboard */}
                   <Box mb="lg" pb="md" style={{ borderBottom: '1px solid rgba(255, 215, 0, 0.2)' }}>
-                    <Text size="sm" c="dimmed" mb="sm">대화 상대 선택</Text>
+                    <Text size="sm" c="dimmed" mb="sm">친구 선택</Text>
                     <Stack gap="sm">
                       {Object.values(CHARACTERS).map((char) => {
                         return (
@@ -614,14 +765,26 @@ export default function Home() {
           <Modal opened={sajuModalOpened} onClose={closeSajuModal} title="운명 데이터 입력" centered overlayProps={{ blur: 3 }}>
             <SajuForm onComplete={handleSajuComplete} onCancel={closeSajuModal} />
           </Modal>
-
-          <Modal opened={tarotModalOpened} onClose={closeTarotModal} fullScreen withCloseButton={false} styles={{ content: { background: 'rgba(0,0,0,0.9)' } }}>
+          <Modal
+            opened={tarotModalOpened}
+            onClose={closeTarotModal}
+            fullScreen
+            transitionProps={{ transition: 'slide-up', duration: 300 }}
+            padding={0}
+            styles={{
+              root: { zIndex: 200 },
+              body: { height: '100dvh', backgroundColor: '#1a1b1e' }
+            }}
+          >
             <TarotCardSelection onSelect={handleTarotComplete} onCancel={closeTarotModal} />
           </Modal>
 
+          {/* [NEW] Obanggi Selection Modal for Hwari - Removed */}
+
           <Modal opened={pungryuModalOpened} onClose={closePungryuModal} fullScreen withCloseButton={false} styles={{ content: { background: '#000' } }}>
-            <PungryuGate onEnter={handlePungryuEnter} onCancel={closePungryuModal} />
+            <PungryuGate onEnter={handleHwajuEnter} onCancel={closePungryuModal} />
           </Modal>
+
         </>
       )}
     </Box>
