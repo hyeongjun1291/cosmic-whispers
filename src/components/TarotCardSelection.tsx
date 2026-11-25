@@ -1,22 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Box, Text, SimpleGrid, Center } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TAROT_CARDS, TarotCard } from '@/lib/tarotData';
+import type { TarotCard } from '@/lib/tarotData';
 
 interface TarotCardSelectionProps {
+    deck: TarotCard[];
     onSelect: (card: TarotCard) => void;
-    onCancel?: () => void;
 }
 
-export default function TarotCardSelection({ onSelect }: TarotCardSelectionProps) {
-    const [deck, setDeck] = useState<TarotCard[]>([]);
+export default function TarotCardSelection({ deck, onSelect }: TarotCardSelectionProps) {
     const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
     const [isFlipped, setIsFlipped] = useState(false);
+    const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-    useEffect(() => {
-        // Shuffle deck on mount
-        const shuffled = [...TAROT_CARDS].sort(() => Math.random() - 0.5);
-        setDeck(shuffled);
+    useEffect(() => () => {
+        timers.current.forEach(clearTimeout);
     }, []);
 
     const handleCardClick = (card: TarotCard) => {
@@ -24,10 +22,10 @@ export default function TarotCardSelection({ onSelect }: TarotCardSelectionProps
         setSelectedCardId(card.id);
 
         // Start flip sequence
-        setTimeout(() => setIsFlipped(true), 600); // Flip after zooming in
-        setTimeout(() => {
-            onSelect(card);
-        }, 3000); // Wait for user to read card
+        timers.current = [
+            setTimeout(() => setIsFlipped(true), 600),
+            setTimeout(() => onSelect(card), 3000),
+        ];
     };
 
     return (

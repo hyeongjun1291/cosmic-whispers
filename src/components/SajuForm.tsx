@@ -1,17 +1,24 @@
 import { useState } from 'react';
-import { TextInput, Select, Button, Stack, Title, Text, Group, Box, Checkbox } from '@mantine/core';
+import { TextInput, Select, Button, Stack, Title, Text, Group, Checkbox } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { IconSparkles } from '@tabler/icons-react';
 import { motion } from 'framer-motion';
 
+export interface SajuFormData {
+    birthDate: string | null;
+    birthTime: string;
+    calendarType: string;
+    isLeap: string;
+}
+
 interface SajuFormProps {
-    onComplete: (data: any) => void;
+    onComplete: (data: SajuFormData) => void;
     onCancel?: () => void;
 }
 
 export default function SajuForm({ onComplete, onCancel }: SajuFormProps) {
-    const [formData, setFormData] = useState({
-        birthDate: null as Date | null,
+    const [formData, setFormData] = useState<SajuFormData>({
+        birthDate: null,
         birthTime: '',
         calendarType: 'solar',
         isLeap: 'false'
@@ -27,7 +34,7 @@ export default function SajuForm({ onComplete, onCancel }: SajuFormProps) {
                     label="생년월일"
                     placeholder="날짜 선택"
                     value={formData.birthDate}
-                    onChange={(d: any) => setFormData({ ...formData, birthDate: d })}
+                    onChange={(date) => setFormData({ ...formData, birthDate: date })}
                     size="md"
                     styles={{ input: { fontSize: '16px' } }} // Mobile friendly
                 />

@@ -5,6 +5,15 @@ export interface TarotCard {
     meaning: string;
 }
 
+export function shuffleTarotDeck(): TarotCard[] {
+    const deck = [...TAROT_CARDS];
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return deck;
+}
+
 export const TAROT_CARDS: TarotCard[] = [
     // Major Arcana
     { id: 'major_0', name: '0. 바보 (The Fool)', image: '/photo/card/0. 바보 카드.jpg', meaning: '시작, 자유, 모험 / 준비가 부족해도 본능을 믿고 첫발을 내디디세요.' },

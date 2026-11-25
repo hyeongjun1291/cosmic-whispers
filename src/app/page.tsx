@@ -1,80 +1,95 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { calculateSaju, SajuData } from '@/lib/saju';
-import { generateCharacterResponse } from '@/lib/groq';
+import { useCallback, useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
+import { calculateSaju, type SajuData } from '@/lib/saju';
+import { LAST_VISIT, clearChatHistory, readBrowserData, resetBrowserData } from '@/lib/browser-data';
+import { ChatClientError, useChatClient } from '@/lib/chat-client';
+import { getAffectionScore, isEmotion, isRecord, MAX_HISTORY_MESSAGE_LENGTH, MAX_USER_NAME_LENGTH, type ChatMessage } from '@/lib/chat-contract';
+import { shuffleTarotDeck, type TarotCard } from '@/lib/tarotData';
 import Onboarding from '@/components/Onboarding';
-import SajuForm from '@/components/SajuForm';
+import SajuForm, { type SajuFormData } from '@/components/SajuForm';
 import TarotCardSelection from '@/components/TarotCardSelection';
 import PungryuGate from '@/components/PungryuGate';
 import VisualNovel from '@/components/VisualNovel';
 import SajuDashboard from '@/components/SajuDashboard';
 import SettingsModal from '@/components/SettingsModal';
 import CharacterSelection from '@/components/CharacterSelection';
-// Removed Talisman Import
+import CharacterNavImage from '@/components/CharacterNavImage';
 import TitleScreen from '@/components/TitleScreen';
 import { saveEpisode, getRelevantEpisodes } from '@/lib/memory';
 import { CHARACTERS } from '@/lib/characters';
 import { Box, Drawer, ActionIcon, Modal, Text, Group, Stack } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconLayoutDashboard } from '@tabler/icons-react';
+import { IconLayoutDashboard, IconSettings } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { Turnstile, TurnstileInstance } from '@marsidev/react-turnstile';
 
 export default function Home() {
-  const [userData, setUserData] = useState<any>(null); // Revert session check
+  const [userData, setUserData] = useState<{ name: string } | null>(null);
   const [saju, setSaju] = useState<SajuData | null>(null);
+  const [sajuBirthTimeKnown, setSajuBirthTimeKnown] = useState(false);
   const [characterId, setCharacterId] = useState<string | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  // const [apiKey, setApiKey] = useState(process.env.NEXT_PUBLIC_GROQ_API_KEY || ''); // Not used on client anymore
+  const [history, setHistory] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [showTitle, setShowTitle] = useState(true); // Restored
-  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const [showTitle, setShowTitle] = useState(true);
   const turnstileRef = useRef<TurnstileInstance>(null);
+  const resetWidget = useCallback(() => turnstileRef.current?.reset(), []);
+  const { request: requestChat, ready: chatReady, setToken, cancel: cancelChat } = useChatClient(resetWidget);
 
-  // Existing Modals & State
   const [settingsOpened, { open: openSettings, close: closeSettings }] = useDisclosure(false);
-  // Dashboard drawer is still used for mobile
   const [dashboardOpened, { toggle: toggleDashboard }] = useDisclosure(false);
   const [sajuModalOpened, { open: openSajuModal, close: closeSajuModal }] = useDisclosure(false);
   const [pendingCharacterId, setPendingCharacterId] = useState<string | null>(null);
   const [tarotModalOpened, { open: openTarotModal, close: closeTarotModal }] = useDisclosure(false);
   const [pungryuModalOpened, { open: openPungryuModal, close: closePungryuModal }] = useDisclosure(false);
-  const [selectedCard, setSelectedCard] = useState<any>(null);
+  const [selectedCard, setSelectedCard] = useState<TarotCard | null>(null);
+  const [tarotDeck, setTarotDeck] = useState<TarotCard[]>([]);
 
-  // New Alert/Confirm Modals
   const [changeCharModalOpened, { open: openChangeCharModal, close: closeChangeCharModal }] = useDisclosure(false);
   const [confirmModalOpened, { open: openConfirmModal, close: closeConfirmModal }] = useDisclosure(false);
   const [alertModalOpened, { open: openAlertModal, close: closeAlertModal }] = useDisclosure(false);
 
   const [confirmConfig, setConfirmConfig] = useState({ title: '', message: '', action: () => { } });
   const [alertMessage, setAlertMessage] = useState('');
-  const [emailOptIn, setEmailOptIn] = useState('');
   const [clearHistoryOnSwitch, setClearHistoryOnSwitch] = useState(false);
   const [affectionScores, setAffectionScores] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    setIsInitialized(true);
-    // Load persisted data
-    const savedUser = localStorage.getItem('cosmic_user');
-    const savedHistory = localStorage.getItem('cosmic_history');
-    const savedChar = localStorage.getItem('cosmic_character');
-    const savedAffection = localStorage.getItem('cosmic_affection');
+    const frame = requestAnimationFrame(() => {
+      const savedUser = readBrowserData('cosmic_user');
+      const savedHistory = readBrowserData('cosmic_history');
+      const savedAffection = readBrowserData('cosmic_affection');
 
-    if (savedUser) setUserData(JSON.parse(savedUser));
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
-    if (savedAffection) setAffectionScores(JSON.parse(savedAffection));
+      if (isRecord(savedUser) && typeof savedUser.name === 'string' && savedUser.name.trim()) {
+        setUserData({ name: savedUser.name.trim().slice(0, MAX_USER_NAME_LENGTH) });
+      }
+      if (Array.isArray(savedHistory)) {
+        const restored: ChatMessage[] = [];
+        for (const entry of savedHistory) {
+          if (!isRecord(entry) || (entry.role !== 'user' && entry.role !== 'model')
+            || typeof entry.text !== 'string' || !entry.text.trim()) continue;
+          restored.push({ role: entry.role, text: entry.text.slice(0, MAX_HISTORY_MESSAGE_LENGTH),
+            emotion: isEmotion(entry.emotion) ? entry.emotion : undefined });
+        }
+        setHistory(restored);
+      }
+      if (isRecord(savedAffection)) {
+        setAffectionScores(Object.fromEntries(Object.keys(CHARACTERS)
+          .map(id => [id, getAffectionScore(savedAffection[id])])));
+      }
+      setIsInitialized(true);
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
-  // Removed apiKey local storage logic as it's server-side now
-
-  const handleOnboardingComplete = (data: any) => {
+  const handleOnboardingComplete = (data: { name: string }) => {
     setUserData(data);
     localStorage.setItem('cosmic_user', JSON.stringify(data));
   };
 
-  const calculateAndSetSaju = (data: any) => {
+  const calculateAndSetSaju = (data: SajuFormData) => {
     const calculated = calculateSaju(
       dayjs(data.birthDate).year(),
       dayjs(data.birthDate).month() + 1,
@@ -103,9 +118,16 @@ export default function Home() {
     return calculated;
   };
 
-  const handleSajuComplete = (data: any) => {
-    const calculated = calculateAndSetSaju(data);
-    setSaju(calculated);
+  const handleSajuComplete = (data: SajuFormData) => {
+    if (!data.birthDate) return;
+    try {
+      calculateAndSetSaju(data);
+    } catch {
+      setAlertMessage('사주를 계산할 수 없어요. 생년월일과 윤달 여부를 다시 확인해 주세요.');
+      openAlertModal();
+      return;
+    }
+    setSajuBirthTimeKnown(data.birthTime !== 'unknown');
     closeSajuModal();
 
     // Proceed to chat with pending character (Cheongsan)
@@ -113,14 +135,14 @@ export default function Home() {
       setCharacterId(pendingCharacterId);
       localStorage.setItem('cosmic_character', pendingCharacterId);
       const char = CHARACTERS[pendingCharacterId];
-      const newHistory = [{ role: 'model', text: char.greeting, emotion: 'default' }];
+      const newHistory: ChatMessage[] = [{ role: 'model', text: char.greeting, emotion: 'default' }];
       setHistory(newHistory);
       localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
       setPendingCharacterId(null);
     }
   };
 
-  const handleTarotComplete = (card: any) => {
+  const handleTarotComplete = (card: TarotCard) => {
     setSelectedCard(card);
     closeTarotModal();
 
@@ -132,47 +154,28 @@ export default function Home() {
     }
   };
 
-  const initializeZionChat = async (charId: string, card: any) => {
+  const initializeZionChat = async (charId: string, card: TarotCard) => {
     setIsTyping(true);
-    setHistory([]); // Clear history
+    setHistory([]);
+    localStorage.setItem(LAST_VISIT, String(Date.now()));
 
     try {
-      // Construct a special prompt for the first message
-      const cardContext = `User drew the Tarot card: ${card.name}.\nMeaning: ${card.meaning}\n\nInterpret this card for the user as your first greeting.`;
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: "행운의 카드를 뽑았습니다. 해석해주세요.",
-          characterId: charId,
-          userName: userData?.name || 'User',
-          context: cardContext,
-          history: [],
-          turnstileToken // Send token
-        })
+      const response = await requestChat({
+        message: '행운의 카드를 뽑았습니다. 해석해주세요.',
+        characterId: charId,
+        userName: userData?.name || 'User',
+        context: `User drew the Tarot card: ${card.name}.\nMeaning: ${card.meaning}\n\nInterpret this card for the user as your first greeting.`,
+        history: [],
+        affectionScore: getAffectionScore(affectionScores[charId]),
       });
-
-      if (res.status === 429) {
-        setAlertMessage('하루 대화 가능 횟수(20회)를 초과했습니다. 내일 다시 와주세요!');
-        openAlertModal();
-        setHistory([{ role: 'model', text: "오늘의 인연은 여기까지인 것 같군요. 내일 다시 만나요.", emotion: 'default' }]);
-        return;
-      }
-
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error(`Chat API Error: ${res.status} ${res.statusText}`, errText);
-        throw new Error(`Chat API Error: ${res.status} - ${errText}`);
-      }
-
-      const response = await res.json();
-      const newHistory = [{ role: 'model', text: response.text, emotion: response.emotion }];
+      const newHistory: ChatMessage[] = [{ role: 'model', text: response.text, emotion: response.emotion }];
       setHistory(newHistory);
       localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
-    } catch (e) {
-      console.error(e);
-      setHistory([{ role: 'model', text: "카드의 기운이 너무 강해 읽을 수가 없군요... 다시 시도해주세요.", emotion: 'default' }]);
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        setAlertMessage(error instanceof ChatClientError ? error.message : '지금은 카드 해석을 가져올 수 없어요.');
+        openAlertModal();
+      }
     } finally {
       setIsTyping(false);
     }
@@ -184,7 +187,7 @@ export default function Home() {
       setCharacterId(pendingCharacterId);
       localStorage.setItem('cosmic_character', pendingCharacterId);
       const char = CHARACTERS[pendingCharacterId];
-      const newHistory = [{ role: 'model', text: char.greeting, emotion: 'default' }];
+      const newHistory: ChatMessage[] = [{ role: 'model', text: char.greeting, emotion: 'default' }];
       setHistory(newHistory);
       localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
       setPendingCharacterId(null);
@@ -192,11 +195,14 @@ export default function Home() {
   };
 
   const handleCharacterSelect = (id: string) => {
+    if (isTyping) return;
+    cancelChat();
     if (id === 'cheongsan' && !saju) {
       setPendingCharacterId(id);
       openSajuModal();
     } else if (id === 'zion') {
       setPendingCharacterId(id);
+      setTarotDeck(shuffleTarotDeck());
       openTarotModal();
     } else if (id === 'pungryu') {
       setPendingCharacterId(id);
@@ -205,163 +211,106 @@ export default function Home() {
       setCharacterId(id);
       localStorage.setItem('cosmic_character', id);
       const char = CHARACTERS[id];
-      const newHistory = [{ role: 'model', text: char.greeting, emotion: 'default' }];
+      const newHistory: ChatMessage[] = [{ role: 'model', text: char.greeting, emotion: 'default' }];
       setHistory(newHistory);
       localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
     }
   };
 
 
-  const [lastVisit, setLastVisit] = useState<number>(0);
-
-  // Proactive Agency: Check last visit & Greet
   useEffect(() => {
-    const checkProactive = async () => {
-      if (!userData || !characterId || history.length === 0) return;
+    if (!userData || !characterId || history.length === 0 || !chatReady || isTyping) return;
+    const storedLastVisit = Number(localStorage.getItem(LAST_VISIT));
+    const now = Date.now();
+    if (!storedLastVisit) {
+      localStorage.setItem(LAST_VISIT, String(now));
+      return;
+    }
+    if (now - storedLastVisit <= 86_400_000) return;
 
-      const storedLastVisit = localStorage.getItem('cosmic_last_visit');
-      const now = Date.now();
+    localStorage.setItem(LAST_VISIT, String(now));
+    const memories = getRelevantEpisodes(3);
+    void requestChat({
+      message: '오랜만에 돌아왔습니다. 먼저 인사를 건네고 안부를 물어봐 주세요.',
+      characterId,
+      userName: userData.name,
+      context: memories ? `[PAST MEMORIES]\n${memories}` : '',
+      history,
+      affectionScore: getAffectionScore(affectionScores[characterId]),
+    }).then(response => {
+      const updated: ChatMessage[] = [...history, { role: 'model', text: response.text, emotion: response.emotion }];
+      setHistory(updated);
+      localStorage.setItem('cosmic_history', JSON.stringify(updated));
+    }).catch(() => {
+      // A failed optional greeting does not change the conversation.
+    });
+  }, [affectionScores, characterId, chatReady, history, isTyping, requestChat, userData]);
 
-      if (storedLastVisit) {
-        const gap = now - parseInt(storedLastVisit);
-        // 24 hours = 86400000. 
-        if (gap > 86400000) {
-          console.log('[Agency] Proactive Greeting Triggered (Gap > 24h)');
-          try {
-            const memories = getRelevantEpisodes(3);
-            const currentAffection = affectionScores[characterId] || 30;
-
-            // Send hidden system prompt
-            const res = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                message: "[SYSTEM: User returned after a long absence (24h+). Initiate conversation proactively. Do not wait for user input. Ask about their well-being.]",
-                characterId,
-                userName: userData.name,
-                context: memories ? `[PAST MEMORIES]\n${memories}` : "",
-                history,
-                affectionScore: currentAffection
-              })
-            });
-            const data = await res.json();
-
-            // Add AI response ONLY (No user message shown)
-            const newHistory = [...history, { role: 'model' as const, text: data.text, emotion: data.emotion }];
-            setHistory(newHistory);
-            localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
-          } catch (e) {
-            console.error("Proactive Gen Failed", e);
-          }
-        }
-      }
-      localStorage.setItem('cosmic_last_visit', now.toString());
-    };
-
-    // Only run if we haven't checked this session? 
-    // Just run once on mount checks? 
-    // Since page reloads, this effect runs.
-    checkProactive();
-  }, [characterId]); // Depend on characterId to ensure we have context
-
-  const handleSendMessage = async (text: string) => {
-    // Update visit time
-    localStorage.setItem('cosmic_last_visit', Date.now().toString());
-
-    console.log('[Client] Sending message, token:', turnstileToken ? turnstileToken.substring(0, 20) + '...' : 'EMPTY');
-
-    const newHistory = [...history, { role: 'user', text }];
-    setHistory(newHistory);
-    localStorage.setItem('cosmic_history', JSON.stringify(newHistory));
+  const handleSendMessage = async (text: string): Promise<boolean> => {
+    if (!characterId || isTyping) return false;
+    localStorage.setItem(LAST_VISIT, String(Date.now()));
     setIsTyping(true);
 
     try {
-      // If character is Zion, use selected Card as context if available
       let context = '';
       if (characterId === 'cheongsan' && saju) {
-        context = `${saju.year.ganji}년 ${saju.month.ganji}월 ${saju.day.ganji}일 ${userData?.birthTime === 'unknown' ? '생시 모름' : saju.time.ganji + '시생'} (${saju.day.sibsin}격)`;
+        const time = sajuBirthTimeKnown ? saju.time.ganji + '시생' : '생시 모름';
+        context = `${saju.year.ganji}년 ${saju.month.ganji}월 ${saju.day.ganji}일 ${time} (${saju.day.sibsin}격)`;
       } else if (characterId === 'zion' && selectedCard) {
         context = `Selected Tarot Card: ${selectedCard.name}\nMeaning: ${selectedCard.meaning}`;
       }
-
-      // Context Injection (Memory)
       const memories = getRelevantEpisodes(3);
-      if (memories) {
-        context += `\n\n[PAST MEMORIES]\n${memories}`;
-      }
+      if (memories) context += `\n\n[PAST MEMORIES]\n${memories}`;
 
-      const currentAffection = characterId ? (affectionScores[characterId] || 30) : 30;
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          characterId: characterId || 'cheongsan',
-          userName: userData?.name || 'User',
-          context,
-          history,
-          turnstileToken, // Send token
-          affectionScore: currentAffection
-        })
+      const currentScore = getAffectionScore(affectionScores[characterId]);
+      const response = await requestChat({
+        message: text,
+        characterId,
+        userName: userData?.name || 'User',
+        context,
+        history,
+        affectionScore: currentScore,
       });
 
-      if (res.status === 429) {
-        setAlertMessage('하루 대화 가능 횟수(20회)를 초과했습니다. 내일 다시 와주세요!');
-        openAlertModal();
-        const limitHistory = [...newHistory, { role: 'model', text: "오늘의 대화 에너지가 소진되었습니다. 내일 다시 만나요.", emotion: 'default' }];
-        setHistory(limitHistory);
-        localStorage.setItem('cosmic_history', JSON.stringify(limitHistory));
-        return;
-      }
-
-      const response = await res.json();
-      const updatedHistory = [...newHistory, { role: 'model', text: response.text, emotion: response.emotion }];
+      const updatedHistory: ChatMessage[] = [...history, { role: 'user', text },
+        { role: 'model', text: response.text, emotion: response.emotion }];
       setHistory(updatedHistory);
       localStorage.setItem('cosmic_history', JSON.stringify(updatedHistory));
 
-      // Save Episode if significant
-      if (Math.abs(response.affectionScore) >= 2) {
-        saveEpisode(text, response.text, response.emotion, response.affectionScore);
-      }
-
-      // Update Affection Score
-      if (characterId && response.affectionScore) {
-        const currentScore = affectionScores[characterId] || 30; // Default starts at 30
-        const delta = response.affectionScore;
-        const newScore = Math.min(100, Math.max(0, currentScore + delta));
-
-        const updatedScores = { ...affectionScores, [characterId]: newScore };
+      const delta = response.affectionScore;
+      if (Math.abs(delta) >= 2) saveEpisode(text, response.text, response.emotion, delta);
+      if (delta !== 0) {
+        const updatedScores = { ...affectionScores, [characterId]: Math.min(100, Math.max(0, currentScore + delta)) };
         setAffectionScores(updatedScores);
         localStorage.setItem('cosmic_affection', JSON.stringify(updatedScores));
-
-        console.log(`[Affection] ${characterId}: ${currentScore} -> ${newScore} (Delta: ${delta})`);
       }
-
+      return true;
     } catch (error) {
-      console.error(error);
-      setHistory([...newHistory, { role: 'model', text: "운명의 흐름에 일시적인 장애가 발생했군요.", emotion: 'frust' }]);
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        setAlertMessage(error instanceof ChatClientError ? error.message : '운명의 흐름에 일시적인 장애가 발생했어요.');
+        openAlertModal();
+      }
+      return false;
     } finally {
       setIsTyping(false);
     }
   };
 
   const handleReset = () => {
+    closeSettings();
     setConfirmConfig({
       title: '데이터 초기화',
       message: '정말로 모든 데이터를 삭제하고 처음으로 돌아가시겠습니까?',
       action: () => {
-        localStorage.removeItem('cosmic_user');
-        localStorage.removeItem('cosmic_history');
-        localStorage.removeItem('cosmic_character');
-        localStorage.removeItem('cosmic_affection');
+        cancelChat();
+        resetBrowserData(localStorage);
         setUserData(null);
         setSaju(null);
+        setSajuBirthTimeKnown(false);
         setHistory([]);
         setCharacterId(null);
         setSelectedCard(null);
         setAffectionScores({});
-        closeSettings();
         closeConfirmModal();
       }
     });
@@ -369,18 +318,15 @@ export default function Home() {
   };
 
   const handleChangeCharacterRequest = () => {
+    closeSettings();
     openChangeCharModal();
   };
 
   const confirmChangeCharacter = () => {
-    if (emailOptIn) {
-      console.log(`[Email Opt-in] User opted in from Char Switch: ${emailOptIn}`);
-      // In real app, post to API here
-    }
-
+    cancelChat();
     if (clearHistoryOnSwitch) {
       setHistory([]);
-      localStorage.removeItem('cosmic_history');
+      clearChatHistory(localStorage);
       setSelectedCard(null);
     }
     setCharacterId(null);
@@ -390,33 +336,21 @@ export default function Home() {
 
   if (!isInitialized) return null;
 
-  // Title Screen
-
-  // Title Screen logic integrated into main return to ensure Turnstile is always mounted
-
-
-  // If authenticated (implicit via Turnstile existence)
-  // ... continue to Game flow
-
-
-  // Dashboard Content Reuse
   const DashboardContent = (
     <>
       <Text size="xl" fw={700} c="gold" mb="md">{characterId === 'zion' ? "당신의 타로 카드" : "당신의 운명 원국"}</Text>
       {characterId === 'cheongsan' && (saju ? <SajuDashboard data={saju} /> : <Box p="md">사주 정보가 없습니다.</Box>)}
       {characterId === 'zion' && (selectedCard ? (
         <Box p="md" ta="center">
-          <img
-            src={selectedCard.image}
-            alt={selectedCard.name}
-            style={{
-              width: '100%',
-              maxHeight: '300px',
-              objectFit: 'contain',
-              borderRadius: '12px',
-              marginBottom: '20px'
-            }}
-          />
+          <Box pos="relative" h={300} mb={20}>
+            <Image
+              src={selectedCard.image}
+              alt={selectedCard.name}
+              fill
+              sizes="(max-width: 768px) 80vw, 320px"
+              style={{ objectFit: 'contain', borderRadius: '12px' }}
+            />
+          </Box>
           <Text size="xl" fw={700} c="gold">{selectedCard.name}</Text>
           <Text size="sm" mt="md">{selectedCard.meaning.split('/')[1]}</Text>
         </Box>
@@ -428,23 +362,18 @@ export default function Home() {
     <Box mih="100vh" style={{ position: 'relative' }}>
       <div className="starfield" />
 
-      {/* Invisible Turnstile Widget - Always mounted to maintain token */}
       {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? (
-        <Box style={{ position: 'fixed', bottom: 10, right: 10, zIndex: 9999, opacity: 0, pointerEvents: 'none' }}>
+        <Box style={{ position: 'fixed', bottom: 10, right: 10, zIndex: 9999 }}>
           <Turnstile
             ref={turnstileRef}
             siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
-            onSuccess={(token: string) => {
-              console.log('[Turnstile] Token received');
-              setTurnstileToken(token);
-            }}
+            options={{ appearance: 'interaction-only' }}
+            onSuccess={setToken}
             onExpire={() => {
-              console.log('[Turnstile] Token expired, resetting...');
-              turnstileRef.current?.reset();
+              setToken();
+              resetWidget();
             }}
-            onError={(error) => {
-              console.error('[Turnstile] Error:', error);
-            }}
+            onError={() => setToken()}
           />
         </Box>
       ) : null}
@@ -478,23 +407,6 @@ export default function Home() {
                   <Text size="sm">기존 대화 내용 지우기</Text>
                 </label>
 
-                <Box pt="md" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                  <Text size="sm" mb={8} c="gold">정식 출시 알림 받기</Text>
-                  <input
-                    type="email"
-                    placeholder="example@email.com"
-                    value={emailOptIn}
-                    onChange={(e) => setEmailOptIn(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '4px',
-                      border: '1px solid #444',
-                      background: 'rgba(0,0,0,0.3)',
-                      color: 'white'
-                    }}
-                  />
-                </Box>
               </Stack>
               <Group justify="flex-end" mt="md">
                 <ActionIcon color="gray" size="xl" variant="subtle" onClick={closeChangeCharModal}>취소</ActionIcon>
@@ -515,12 +427,9 @@ export default function Home() {
                 onSendMessage={handleSendMessage}
                 isTyping={isTyping}
                 characterId={characterId}
-                affectionScore={affectionScores[characterId] || 30}
+                affectionScore={getAffectionScore(affectionScores[characterId])}
                 onSwitchToCharacter={(id) => {
                   if (id === characterId) return;
-                  // Directly switch, handling prerequisites via existing handler logic if needed, 
-                  // or just set ID if we assume prerequisites (like Saju) are global.
-                  // Use handleCharacterSelect to be safe (it checks Saju/Tarot existence).
                   handleCharacterSelect(id);
                 }}
                 dashboard={DashboardContent}
@@ -551,7 +460,7 @@ export default function Home() {
                     <Text size="sm" c="dimmed" mb="sm">대화 상대 선택</Text>
                     <Stack gap="sm">
                       {Object.values(CHARACTERS).map((char) => {
-                        const affection = affectionScores[char.id] || 30;
+                        const affection = getAffectionScore(affectionScores[char.id]);
                         return (
                           <Box
                             key={char.id}
@@ -582,14 +491,7 @@ export default function Home() {
                                   flexShrink: 0
                                 }}
                               >
-                                <img
-                                  src={`/images/ui/nav_${char.id}.png`}
-                                  alt={char.name}
-                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                  onError={(e) => {
-                                    e.currentTarget.src = `/images/characters/${char.imageNumber}_default.jpg`;
-                                  }}
-                                />
+                                <CharacterNavImage character={char} size={40} />
                               </Box>
                               <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
                                 <Text size="sm" fw={characterId === char.id ? 700 : 500} c={characterId === char.id ? 'gold' : 'white'}>
@@ -637,10 +539,26 @@ export default function Home() {
                 </Drawer>
               </Box>
 
+            </>
+          )}
+
+          {userData && (
+            <>
+              <ActionIcon
+                aria-label="시스템 설정"
+                onClick={openSettings}
+                variant="light"
+                color="gray"
+                size="lg"
+                style={{ position: 'absolute', top: 12, right: 12, zIndex: 70 }}
+              >
+                <IconSettings size={20} />
+              </ActionIcon>
               <SettingsModal
                 opened={settingsOpened}
                 onClose={closeSettings}
                 onReset={handleReset}
+                onChangeCharacter={characterId ? handleChangeCharacterRequest : undefined}
               />
             </>
           )}
@@ -650,7 +568,7 @@ export default function Home() {
           </Modal>
 
           <Modal opened={tarotModalOpened} onClose={closeTarotModal} fullScreen withCloseButton={false} styles={{ content: { background: 'rgba(0,0,0,0.9)' } }}>
-            <TarotCardSelection onSelect={handleTarotComplete} onCancel={closeTarotModal} />
+            <TarotCardSelection deck={tarotDeck} onSelect={handleTarotComplete} />
           </Modal>
 
           <Modal opened={pungryuModalOpened} onClose={closePungryuModal} fullScreen withCloseButton={false} styles={{ content: { background: '#000' } }}>

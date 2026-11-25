@@ -5,6 +5,8 @@
   --accent: #2e3440;
   --gold: #ffd700;
   --blue-silk: #2a4365;
+  --font-sans: 'Outfit Variable', 'Noto Serif KR Variable', sans-serif;
+  --font-serif: 'Noto Serif KR Variable', serif;
 }
 
 body {
@@ -14,7 +16,7 @@ body {
   /* Night Sky Gradient */
   background-attachment: fixed;
   color: var(--foreground);
-  font-family: 'Outfit', 'Noto Serif KR', serif;
+  font-family: var(--font-sans);
   overflow-x: hidden;
   min-height: 100vh;
 }
@@ -143,9 +145,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* Fill the square, effectively cropping to center */
   object-position: center;
-  /* Or top center as before? User said "squarely then circle", center is safest default unless faces are high */
 }
 
 /* Character Name Overlay */

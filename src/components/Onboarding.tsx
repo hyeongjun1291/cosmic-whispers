@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { TextInput, Button, Stack, Title, Text, Box } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IconArrowRight } from '@tabler/icons-react';
+import { MAX_USER_NAME_LENGTH } from '@/lib/chat-contract';
 
 interface OnboardingProps {
-    onComplete: (data: any) => void;
+    onComplete: (data: { name: string }) => void;
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
@@ -29,14 +30,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                         <TextInput
                             placeholder="이름을 입력하세요"
                             value={name}
+                            maxLength={MAX_USER_NAME_LENGTH}
                             onChange={(e) => setName(e.target.value)}
                             size="md"
                             variant="filled"
                         />
                         <Button
                             rightSection={<IconArrowRight size={16} />}
-                            onClick={() => onComplete({ name })}
-                            disabled={!name}
+                            onClick={() => onComplete({ name: name.trim() })}
+                            disabled={!name.trim()}
                             color="indigo"
                         >
                             다음으로

@@ -1,9 +1,8 @@
 'use client';
 
-import { SimpleGrid, Card, Text, Group, Badge, Button, Stack, Image, Box, ActionIcon, TextInput } from '@mantine/core';
+import { Card, Text, Group, Badge, Button, Stack, Image, Box } from '@mantine/core';
 import { CHARACTERS } from '@/lib/characters';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconMail, IconCheck } from '@tabler/icons-react';
 import { useState } from 'react';
 
 interface CharacterSelectionProps {
@@ -33,10 +32,6 @@ export default function CharacterSelection({ onSelect }: CharacterSelectionProps
         if (dist > length / 2) dist -= length;
         if (dist < -length / 2) dist += length;
 
-        // "3 items exposed" rule:
-        // Only show if dist is -1, 0, or 1.
-        // But for smoother animations during rapid switching, we might technically render others but hidden.
-        // However, standard CoverFlow usually shows stack. User said "Expose only 3".
         const isActive = dist === 0;
         const isNeighbor = Math.abs(dist) === 1;
         const isVisible = isActive || isNeighbor;
@@ -48,18 +43,16 @@ export default function CharacterSelection({ onSelect }: CharacterSelectionProps
                 scale: 0.5,
                 zIndex: -1,
                 rotateY: 0,
-                display: 'none' // functional change to ensure they don't interfere
+                display: 'none'
             };
         }
 
-        const sign = Math.sign(dist); // -1 (Left), 0 (Center), 1 (Right)
-
         return {
-            x: dist * 260, // Tighter overlap (Card width ~320) but rotated
+            x: dist * 260,
             scale: isActive ? 1 : 0.8,
             zIndex: isActive ? 10 : 5,
             opacity: isActive ? 1 : 0.6,
-            rotateY: 0, // Tilt removed as per request
+            rotateY: 0,
             rotateZ: 0,
             display: 'block'
         };
@@ -203,50 +196,6 @@ export default function CharacterSelection({ onSelect }: CharacterSelectionProps
                 </Box>
             </Box>
 
-            {/* Email Subscription Section */}
-            <Box mt="xl" p="xl" style={{ borderTop: '1px solid rgba(255,215,0,0.2)', width: '100%', maxWidth: '600px' }}>
-                <Stack align="center" gap="sm">
-                    <Text c="gold" size="lg" fw={600}>정식 출시 알림 받기</Text>
-                    <EmailSubscription />
-                </Stack>
-            </Box>
         </Stack>
-    );
-}
-
-function EmailSubscription() {
-    const [email, setEmail] = useState('');
-    const [submitted, setSubmitted] = useState(false);
-
-    const handleSubmit = () => {
-        if (!email.includes('@')) return;
-        console.log('[Email Sub]', email);
-        setSubmitted(true);
-    };
-
-    if (submitted) {
-        return (
-            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}>
-                <Group gap="xs" c="green.4">
-                    <IconCheck size={20} />
-                    <Text fw={700}>감사합니다! 소식을 꼭 전해드릴게요.</Text>
-                </Group>
-            </motion.div>
-        );
-    }
-
-    return (
-        <Group w="100%">
-            <TextInput
-                placeholder="이메일을 입력하세요"
-                value={email}
-                onChange={(e) => setEmail(e.currentTarget.value)}
-                leftSection={<IconMail size={16} />}
-                styles={{ input: { backgroundColor: 'rgba(0,0,0,0.3)', borderColor: 'rgba(255,215,0,0.3)', color: 'white' } }}
-                style={{ flex: 1 }}
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            />
-            <Button variant="outline" color="gold" onClick={handleSubmit}>신청</Button>
-        </Group>
     );
 }

@@ -3,11 +3,13 @@ import { ColorSchemeScript, MantineProvider, createTheme } from "@mantine/core";
 import "@mantine/core/styles.css";
 import "@mantine/dates/styles.css";
 import "@mantine/notifications/styles.css";
+import "@fontsource-variable/outfit";
+import "@fontsource-variable/noto-serif-kr";
 import "./globals.css";
 
 const theme = createTheme({
   primaryColor: 'indigo',
-  fontFamily: 'Outfit, sans-serif',
+  fontFamily: 'var(--font-sans)',
 });
 
 export const metadata: Metadata = {
@@ -24,9 +26,6 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <head>
         <ColorSchemeScript defaultColorScheme="dark" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Noto+Serif+KR:wght@300;400;700&display=swap" rel="stylesheet" />
       </head>
       <body>
         <div className="starfield" />

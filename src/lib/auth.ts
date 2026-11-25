@@ -1,24 +1,28 @@
-import NextAuth, { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
-export const authOptions: NextAuthOptions = {
-    providers: [
-        GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID || "",
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-        }),
-    ],
-    callbacks: {
-        async session({ session, token }) {
-            if (session.user) {
-                // @ts-ignore // Simple prototype extension
-                session.user.id = token.sub;
-            }
-            return session;
+export function getAuthOptions(): NextAuthOptions | null {
+    const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, NEXTAUTH_SECRET } = process.env;
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !NEXTAUTH_SECRET || NEXTAUTH_SECRET.length < 32) {
+        return null;
+    }
+
+    return {
+        providers: [
+            GoogleProvider({
+                clientId: GOOGLE_CLIENT_ID,
+                clientSecret: GOOGLE_CLIENT_SECRET,
+            }),
+        ],
+        callbacks: {
+            async session({ session, token }) {
+                if (session.user) {
+                    Object.assign(session.user, { id: token.sub });
+                }
+                return session;
+            },
         },
-    },
-    session: {
-        strategy: "jwt",
-    },
-    secret: process.env.NEXTAUTH_SECRET || "fallback_secret_for_prototype",
-};
+        session: { strategy: "jwt" },
+        secret: NEXTAUTH_SECRET,
+    };
+}

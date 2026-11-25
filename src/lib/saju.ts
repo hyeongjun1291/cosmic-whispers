@@ -53,14 +53,8 @@ export function calculateSaju(
   let solarDay = day;
 
   if (isLunar) {
-    // @ts-ignore
-    const lunar = Lunar.fromYmdHms(year, month, day, hour, minute, 0);
-    // @ts-ignore
-    if (isLeap) lunar.setLeap(true); // Assuming API supports this or input handles it
-    // Note: lunar-javascript fromYmdHms default treats as non-leap. 
-    // For precise lunar leap handling, use Lunar.fromYmd(...) then set leap.
-    // But strictly, we need to find the Solar date corresponding to this Lunar date.
-    // If user inputs Lunar, we trust the conversion.
+    // lunar-javascript represents a leap month with a negative month number.
+    const lunar = Lunar.fromYmdHms(year, isLeap ? -month : month, day, hour, minute, 0);
     const solar = lunar.getSolar();
     solarYear = solar.getYear();
     solarMonth = solar.getMonth();
@@ -86,7 +80,6 @@ export function calculateSaju(
   const adjMin = date.getMinutes();
 
   // 3. Create Solar object with ADJUSTED time
-  // @ts-ignore
   const solar = Solar.fromYmdHms(adjYear, adjMonth, adjDay, adjHour, adjMin, 0);
 
   // 4. Get EightChar (Saju)

@@ -3,19 +3,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { Box, Paper, Text, Stack, Group, ActionIcon, ScrollArea, Tooltip, Divider, RingProgress } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconSettings, IconSend, IconUsers, IconChevronUp, IconChevronDown, IconHeartFilled } from '@tabler/icons-react';
-import { CHARACTERS } from '@/lib/characters';
-
-interface Message {
-    role: 'user' | 'model';
-    text: string;
-    emotion?: string;
-}
+import { IconSend, IconChevronUp, IconChevronDown, IconHeartFilled } from '@tabler/icons-react';
+import { CHARACTERS, type Character } from '@/lib/characters';
+import { MAX_MESSAGE_LENGTH, type ChatMessage } from '@/lib/chat-contract';
+import CharacterNavImage from './CharacterNavImage';
 
 interface VisualNovelProps {
     userName: string;
-    history: Message[];
-    onSendMessage: (msg: string) => void;
+    history: ChatMessage[];
+    onSendMessage: (msg: string) => Promise<boolean>;
     onSwitchToCharacter: (id: string) => void;
     isTyping: boolean;
     characterId: string;
@@ -36,7 +32,6 @@ export default function VisualNovel({
     const [inputText, setInputText] = useState('');
     const lastMessage = history[history.length - 1];
     const scrollRef = useRef<HTMLDivElement>(null);
-    const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
     const prevAffectionRef = useRef(affectionScore);
     const prevCharacterIdRef = useRef(characterId);
     const [affectionDelta, setAffectionDelta] = useState<{ id: number; value: number } | null>(null);
@@ -88,23 +83,16 @@ export default function VisualNovel({
 
     const imagePath = `/images/characters/${character.imageNumber}_${currentEmotion}.${extension}`;
 
-    // Handle image load to get aspect ratio
-    const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-        const img = e.currentTarget;
-        const ratio = img.naturalWidth / img.naturalHeight;
-        setImageAspectRatio(ratio);
-    };
-
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [history]);
 
-    const handleSend = () => {
-        if (inputText.trim()) {
-            onSendMessage(inputText);
-            setInputText('');
+    const handleSend = async () => {
+        const message = inputText.trim();
+        if (!isTyping && message && await onSendMessage(message)) {
+            setInputText(current => current.trim() === message ? '' : current);
         }
     };
 
@@ -113,8 +101,6 @@ export default function VisualNovel({
             {/* Background */}
             <Box className="oriental-pattern" style={{ position: 'absolute', inset: 0, zIndex: 0 }} />
 
-            {/* Top Controls */}
-            {/* Top Controls - REMOVED per request */}
             {/* Main Layout: Desktop - 3 Columns, Mobile - Full Screen with Overlay */}
             <Box className="main-layout">
                 {/* Left Side - Dashboard (Desktop Only) */}
@@ -136,15 +122,7 @@ export default function VisualNovel({
                                             filter: characterId === char.id ? 'drop-shadow(0 0 5px gold)' : 'grayscale(0.5)'
                                         }}
                                     >
-                                        <img
-                                            src={`/images/ui/nav_${char.id}.png`}
-                                            alt={char.name}
-                                            onError={(e) => {
-                                                e.currentTarget.src = `/images/characters/${char.imageNumber}_default.jpg`;
-                                                e.currentTarget.style.objectFit = 'cover';
-                                                e.currentTarget.style.borderRadius = '50%';
-                                            }}
-                                        />
+                                        <CharacterNavImage character={char} size={60} />
                                     </button>
                                 </Tooltip>
                             ))}
@@ -164,7 +142,6 @@ export default function VisualNovel({
                                     exit={{ opacity: 0 }}
                                     transition={{ duration: 0.5 }}
                                     className="character-portrait"
-                                    onLoad={handleImageLoad}
                                 />
                             </AnimatePresence>
 
@@ -297,8 +274,9 @@ export default function VisualNovel({
                             <Group gap="xs">
                                 <input
                                     value={inputText}
+                                    maxLength={MAX_MESSAGE_LENGTH}
                                     onChange={(e) => setInputText(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                    onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && void handleSend()}
                                     placeholder={`${character.name}에게 말을 걸어보세요...`}
                                     className="chat-input"
                                     style={{
@@ -336,7 +314,17 @@ export default function VisualNovel({
     );
 }
 
-// Mobile Chat Overlay Component
+interface MobileChatOverlayProps {
+    history: ChatMessage[];
+    character: Character;
+    userName: string;
+    inputText: string;
+    setInputText: (value: string) => void;
+    handleSend: () => Promise<void>;
+    isTyping: boolean;
+    formatText: (text: string) => string;
+}
+
 function MobileChatOverlay({
     history,
     character,
@@ -346,7 +334,7 @@ function MobileChatOverlay({
     handleSend,
     isTyping,
     formatText
-}: any) {
+}: MobileChatOverlayProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false); // New state to hide chat completely
     const [startY, setStartY] = useState(0);
@@ -455,7 +443,7 @@ function MobileChatOverlay({
                                             {history.length}개
                                         </Text>
                                     </Group>
-                                    {history.map((msg: any, idx: number) => (
+                                    {history.map((msg, idx) => (
                                         <Box
                                             key={idx}
                                             className={msg.role === 'user' ? 'message-user' : 'message-model'}
@@ -526,8 +514,9 @@ function MobileChatOverlay({
                             <Group gap="xs">
                                 <input
                                     value={inputText}
+                                    maxLength={MAX_MESSAGE_LENGTH}
                                     onChange={(e) => setInputText(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                    onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && void handleSend()}
                                     placeholder={`${character.name}에게 말을 걸어보세요...`}
                                     className="chat-input"
                                     style={{

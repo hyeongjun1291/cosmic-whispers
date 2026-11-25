@@ -1,38 +1,24 @@
-export async function verifyTurnstileToken(token: string): Promise<boolean> {
-    const secretKey = process.env.TURNSTILE_SECRET_KEY;
+import { isRecord } from './chat-contract';
 
-    if (!secretKey) {
-        console.error("Server Error: TURNSTILE_SECRET_KEY is not set.");
-        return false;
-    }
+const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+const TEST_SECRET_KEYS = new Set([
+    '1x0000000000000000000000000000000AA',
+    '2x0000000000000000000000000000000AA',
+    '3x0000000000000000000000000000000AA',
+]);
 
-    // Cloudflare 테스트 키 처리 (항상 통과)
-    const TEST_SECRET_KEYS = [
-        '1x0000000000000000000000000000000AA',
-        '2x0000000000000000000000000000000AA',
-        '3x0000000000000000000000000000000AA'
-    ];
+export function isProductionTurnstileConfigured(secret?: string, siteKey?: string): boolean {
+    return Boolean(secret && !TEST_SECRET_KEYS.has(secret)
+        && siteKey && !/^[123]x0{20,}/.test(siteKey));
+}
 
-    if (TEST_SECRET_KEYS.includes(secretKey)) {
-        console.log('[Turnstile] Using test key - auto pass');
-        return true;
-    }
-
-    try {
-        const formData = new FormData();
-        formData.append('secret', secretKey);
-        formData.append('response', token);
-
-        const result = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-            method: 'POST',
-            body: formData,
-        });
-
-        const outcome = await result.json();
-        console.log('[Turnstile] Verification result:', outcome.success);
-        return outcome.success;
-    } catch (e) {
-        console.error("Turnstile Verification Error:", e);
-        return false;
-    }
+export async function verifyTurnstileToken(token: string, secretKey: string): Promise<boolean> {
+    const result = await fetch(SITEVERIFY_URL, {
+        method: 'POST',
+        body: new URLSearchParams({ secret: secretKey, response: token }),
+        signal: AbortSignal.timeout(4000),
+    });
+    if (!result.ok) throw new Error('Turnstile service unavailable');
+    const outcome: unknown = await result.json();
+    return isRecord(outcome) && outcome.success === true;
 }

@@ -1,66 +1,26 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { checkRateLimit, getRemainingRequests } from "@/lib/rate-limit";
-import { generateCharacterResponse } from "@/lib/groq";
-import { verifyTurnstileToken } from "@/lib/turnstile";
+import { handleChat } from '@/lib/chat-handler';
+import { generateCharacterResponse } from '@/lib/groq';
+import { consumeChatQuota, getRateLimitKey, hasDistributedRateLimit } from '@/lib/rate-limit';
+import { isProductionTurnstileConfigured, verifyTurnstileToken } from '@/lib/turnstile';
 
-export async function POST(req: NextRequest) {
-    // 1. Get IP Address for Rate Limiting
-    let ip = req.headers.get("x-forwarded-for") || "unknown_ip";
-    if (ip.includes(',')) ip = ip.split(',')[0];
+export const runtime = 'nodejs';
 
-    // 2. Check Rate Limit
-    const isAllowed = checkRateLimit(ip);
-    const remaining = getRemainingRequests(ip);
+export async function POST(request: Request) {
+    const production = process.env.NODE_ENV === 'production';
+    const apiKey = process.env.GROQ_API_KEY;
+    const secret = process.env.TURNSTILE_SECRET_KEY;
 
-    if (!isAllowed) {
-        return NextResponse.json({
-            error: "Rate limit exceeded. You can only send 20 messages per day.",
-            limitReached: true
-        }, { status: 429 });
-    }
+    const configured = Boolean(apiKey) && (!production || (
+        hasDistributedRateLimit() && isProductionTurnstileConfigured(secret, process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
+    ));
 
-    try {
-        const body = await req.json();
-        const { message, characterId, userName, context, history, turnstileToken, affectionScore } = body;
-
-        // 3. Verify Turnstile Token
-        if (process.env.TURNSTILE_SECRET_KEY) {
-            if (!turnstileToken) {
-                return NextResponse.json({ error: "Missing CAPTCHA token" }, { status: 400 });
-            }
-            const isValidToken = await verifyTurnstileToken(turnstileToken);
-            if (!isValidToken) {
-                return NextResponse.json({ error: "Invalid CAPTCHA token" }, { status: 403 });
-            }
-        }
-
-        const apiKey = process.env.GROQ_API_KEY || "";
-        if (!apiKey) {
-            return NextResponse.json({ error: "Server Configuration Error: API Key missing" }, { status: 500 });
-        }
-
-        const response = await generateCharacterResponse(
-            apiKey,
-            characterId,
-            userName || 'User',
-            message,
-            context,
-            history,
-            affectionScore || 30
-        );
-
-        return NextResponse.json({
-            text: response.text,
-            emotion: response.emotion,
-            affectionScore: response.affectionScore,
-            remaining
-        });
-
-    } catch (error) {
-        console.error("[Chat API] Error:", error);
-        return NextResponse.json({
-            error: "Internal Server Error",
-            details: error instanceof Error ? error.message : String(error)
-        }, { status: 500 });
-    }
+    return handleChat(request, {
+        configured,
+        verifyToken: secret ? token => verifyTurnstileToken(token, secret) : undefined,
+        quota: () => consumeChatQuota(getRateLimitKey(request.headers, process.env.VERCEL === '1')),
+        generate: input => {
+            if (!apiKey) throw new Error('Missing model credentials');
+            return generateCharacterResponse(apiKey, input);
+        },
+    });
 }

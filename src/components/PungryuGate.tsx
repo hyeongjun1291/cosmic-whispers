@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Box, Text, Button, Modal, Stack, Overlay } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
 

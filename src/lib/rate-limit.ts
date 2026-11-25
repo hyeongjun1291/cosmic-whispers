@@ -1,47 +1,65 @@
-type RateLimitStore = {
-    [key: string]: {
-        count: number;
-        lastReset: number;
-    };
-};
+import { createHash } from 'node:crypto';
+import { isIP } from 'node:net';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+import { DAILY_CHAT_LIMIT } from './chat-contract';
 
-// In-memory store (Resets on restart)
-const globalRateLimitStore: RateLimitStore = {};
+const DAY_MS = 86_400_000;
 
-export function checkRateLimit(identifier: string, limit: number = 1000): boolean {
-    const now = Date.now();
-    const today = new Date(now).setHours(0, 0, 0, 0);
-
-    if (!globalRateLimitStore[identifier]) {
-        globalRateLimitStore[identifier] = { count: 1, lastReset: today };
-        return true;
-    }
-
-    const userData = globalRateLimitStore[identifier];
-
-    // Reset if it's a new day
-    if (userData.lastReset < today) {
-        userData.count = 1;
-        userData.lastReset = today;
-        return true;
-    }
-
-    if (userData.count >= limit) {
-        return false;
-    }
-
-    userData.count++;
-    return true;
+export interface Quota {
+    allowed: boolean;
+    remaining: number;
+    reset: number;
 }
 
-export function getRemainingRequests(identifier: string, limit: number = 1000): number {
-    const userData = globalRateLimitStore[identifier];
-    if (!userData) return limit;
+export function getRateLimitKey(headers: Headers, vercel: boolean): string {
+    const ip = vercel ? headers.get('x-vercel-forwarded-for')?.trim() : undefined;
+    return ip && isIP(ip) ? createHash('sha256').update(ip).digest('hex') : 'shared';
+}
 
-    const now = Date.now();
-    const today = new Date(now).setHours(0, 0, 0, 0);
+export function createLocalRateLimiter(now = Date.now) {
+    let day = -1;
+    const counts = new Map<string, number>();
+    return (key: string): Quota => {
+        const currentDay = Math.floor(now() / DAY_MS);
+        if (day !== currentDay) {
+            counts.clear();
+            day = currentDay;
+        }
+        const count = counts.get(key) ?? 0;
+        const allowed = count < DAILY_CHAT_LIMIT;
+        if (allowed) counts.set(key, count + 1);
+        return {
+            allowed,
+            remaining: Math.max(0, DAILY_CHAT_LIMIT - count - (allowed ? 1 : 0)),
+            reset: (currentDay + 1) * DAY_MS,
+        };
+    };
+}
 
-    if (userData.lastReset < today) return limit;
+const localLimit = createLocalRateLimiter();
+let distributedLimit: Ratelimit | undefined;
 
-    return Math.max(0, limit - userData.count);
+export function hasDistributedRateLimit(): boolean {
+    return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+}
+
+export async function consumeChatQuota(key: string): Promise<Quota> {
+    if (!hasDistributedRateLimit()) {
+        if (process.env.NODE_ENV === 'production') throw new Error('Missing chat quota store');
+        return localLimit(key);
+    }
+
+    distributedLimit ??= new Ratelimit({
+        redis: Redis.fromEnv(),
+        limiter: Ratelimit.fixedWindow(DAILY_CHAT_LIMIT, '1 d'),
+        prefix: `cosmic-whispers:chat:${process.env.VERCEL_ENV ?? process.env.NODE_ENV}`,
+        timeout: 2500,
+        analytics: false,
+        ephemeralCache: false,
+    });
+    const quota = await distributedLimit.limit(key);
+    if (quota.reason === 'timeout') throw new Error('Chat quota store timed out');
+
+    return { allowed: quota.success, remaining: quota.remaining, reset: quota.reset };
 }

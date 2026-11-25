@@ -11,14 +11,6 @@ const OHAENG_COLORS: Record<Ohaeng, string> = {
     '水': '#212529', // Black/Dark
 };
 
-const OHAENG_LABELS: Record<string, string> = {
-    '木': '목 (Tree)',
-    '火': '화 (Fire)',
-    '土': '토 (Earth)',
-    '金': '금 (Metal)',
-    '水': '수 (Water)',
-};
-
 export default function SajuDashboard({ data }: { data: SajuData }) {
     const pillars = [
         { label: '시주 (Time)', data: data.time },
@@ -84,7 +76,7 @@ export default function SajuDashboard({ data }: { data: SajuData }) {
                                             boxShadow: `0 0 15px ${OHAENG_COLORS[p.data.ohaeng]}40`,
                                             fontSize: '24px',
                                             fontWeight: 700,
-                                            fontFamily: "'Noto Serif KR', serif"
+                                            fontFamily: "var(--font-serif)"
                                         }}
                                     >
                                         {p.data.ganji.split('')[0]}
@@ -106,7 +98,7 @@ export default function SajuDashboard({ data }: { data: SajuData }) {
                                             boxShadow: `0 0 15px ${OHAENG_COLORS[p.data.ohaeng]}40`,
                                             fontSize: '24px',
                                             fontWeight: 700,
-                                            fontFamily: "'Noto Serif KR', serif"
+                                            fontFamily: "var(--font-serif)"
                                         }}
                                     >
                                         {p.data.ganji.split('')[1]}

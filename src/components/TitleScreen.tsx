@@ -27,7 +27,7 @@ export default function TitleScreen({ onEnter }: TitleScreenProps) {
                 size="3.5rem"
                 c="gold"
                 className="title-glow main-title"
-                style={{ fontFamily: "'Noto Serif KR', serif", letterSpacing: '0.2em', textAlign: 'center' }}
+                style={{ fontFamily: 'var(--font-serif)', letterSpacing: '0.2em', textAlign: 'center' }}
             >
                 별의 속삭임
             </Title>

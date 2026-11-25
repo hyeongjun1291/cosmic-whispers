@@ -1,184 +1,29 @@
-# 🚀 Cosmic Whispers 배포 체크리스트
+# 배포 설정
 
-## ✅ 배포 전 준비 (15분)
+로컬 실행 절차는 [README](README.md)에 있습니다. 배포 전 Node.js 20.9 이상에서 `npm ci`, `npm run lint`, `npm test`, `npm run build`를 실행합니다.
 
-### 1. 코드 최종 점검
-- [ ] 로컬에서 빌드 성공 확인
-  ```bash
-  npm run build
-  npm start
-  ```
-- [ ] 콘솔 에러 확인 및 수정
-- [ ] 모바일/데스크탑 반응형 테스트
-- [ ] 모든 캐릭터 대화 테스트
+## 환경 변수
 
-### 2. 환경 변수 준비
-- [ ] Groq API 키 확인 (https://console.groq.com)
-- [ ] Cloudflare Turnstile Site Key 확인
-- [ ] Cloudflare Turnstile Secret Key 확인
-- [ ] `.env.example` 파일 생성 완료
+운영과 공개 프리뷰에 사용할 값입니다. 비밀 키와 토큰은 서버 환경 변수에만 보관합니다.
 
-### 3. Git 저장소 설정
-- [ ] `.gitignore`에 `.env.local` 포함 확인
-- [ ] GitHub에 저장소 생성
-- [ ] 코드 push 완료
-  ```bash
-  git init
-  git add .
-  git commit -m "Initial commit"
-  git branch -M main
-  git remote add origin https://github.com/YOUR_USERNAME/cosmic-whispers.git
-  git push -u origin main
-  ```
+| 이름 | 용도 |
+| --- | --- |
+| `GROQ_API_KEY` | Groq 서버 API 키 |
+| `GROQ_MODEL` | JSON Object Mode를 지원하는 모델 ID. 기본값은 `openai/gpt-oss-120b` |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | 배포 도메인을 허용한 실제 Cloudflare 위젯의 공개 키 |
+| `TURNSTILE_SECRET_KEY` | 위젯의 서버 검증용 비밀 키 |
+| `UPSTASH_REDIS_REST_URL` | 일일 요청 한도를 공유하는 Upstash Redis의 REST URL |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis의 서버 인증 토큰 |
 
----
+운영 모드에서 필수 설정이 없거나, CAPTCHA 또는 요청 한도를 확인하는 외부 서비스가 응답하지 않으면 채팅 API는 `503`을 반환합니다. Cloudflare 테스트 키는 로컬 개발에서만 사용합니다. Vercel이 보장하는 IP 헤더를 사용할 수 없는 환경에서는 모든 요청이 공용 한도를 공유합니다.
 
-## 🌐 Vercel 배포 (10분)
+Google OAuth가 필요한 환경에서는 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, 최소 32자 이상의 무작위 `NEXTAUTH_SECRET`, `NEXTAUTH_URL`을 설정합니다. 자격 증명이 없으면 인증 경로는 `503`을 반환합니다. 채팅 화면의 온보딩은 표시 이름을 쓰며 Google 로그인을 요구하지 않습니다.
 
-### Step 1: 프로젝트 Import
-1. [ ] [Vercel Dashboard](https://vercel.com/dashboard) 접속
-2. [ ] "New Project" 클릭
-3. [ ] GitHub 저장소 `cosmic-whispers` 선택
-4. [ ] Framework Preset: **Next.js** 확인
+## 배포 후 확인
 
-### Step 2: 환경 변수 설정
-Project Settings → Environment Variables:
+- 실제 Turnstile 위젯으로 같은 세션에서 연속 두 턴이 완료되는지 확인합니다.
+- 청산의 사주 입력과 시온의 첫 타로 해석을 확인합니다.
+- 사용량 한도를 넘기면 `429`와 재시도 시간이 오는지 확인합니다.
+- 설정에서 데이터를 초기화한 뒤 브라우저에 이전 대화나 기억이 남지 않는지 확인합니다.
 
-```
-GROQ_API_KEY = gsk_...
-NEXT_PUBLIC_TURNSTILE_SITE_KEY = 0x4AA...
-TURNSTILE_SECRET_KEY = 0x4AB...
-```
-
-**중요**: 모든 환경(Production, Preview, Development)에 체크!
-
-### Step 3: 배포
-- [ ] "Deploy" 버튼 클릭
-- [ ] 빌드 로그 확인 (2-3분 소요)
-- [ ] 배포 완료 확인
-
----
-
-## 🧪 배포 후 테스트 (5분)
-
-### 필수 테스트
-- [ ] 타이틀 화면 로딩
-- [ ] Turnstile CAPTCHA 표시 확인
-- [ ] 온보딩 프로세스 완료
-- [ ] 캐릭터 선택 및 대화 테스트
-  - [ ] 청산 (사주 입력 → 대화)
-  - [ ] 지온 (타로 선택 → 대화)
-  - [ ] 풍류 (풍류도 입문 → 대화)
-- [ ] Rate limiting 확인 (20회 제한)
-- [ ] 모바일 반응형 확인
-- [ ] Dashboard 열기/닫기 테스트
-
-### 성능 체크
-- [ ] Lighthouse 점수 확인
-  - Performance: 90+ 목표
-  - Accessibility: 90+ 목표
-  - Best Practices: 90+ 목표
-  - SEO: 90+ 목표
-
----
-
-## 🔧 선택적 설정
-
-### 커스텀 도메인 (선택)
-1. [ ] 도메인 구매 (Namecheap, Cloudflare 등)
-2. [ ] Vercel Project Settings → Domains
-3. [ ] 도메인 추가 및 DNS 설정
-4. [ ] SSL 자동 적용 확인
-
-### Analytics (선택)
-- [ ] Vercel Analytics 활성화
-- [ ] Google Analytics 태그 추가 (선택)
-
-### 모니터링 (선택)
-- [ ] Vercel Monitoring 확인
-- [ ] Error tracking (Sentry 등) 설정
-
----
-
-## 📊 운영 관리
-
-### 일일 체크
-- [ ] API 사용량 모니터링
-  - Groq API quota
-  - Turnstile verifications
-  - Vercel bandwidth
-
-### 주간 체크
-- [ ] 사용자 피드백 확인
-- [ ] 에러 로그 검토
-- [ ] 성능 지표 확인
-
-### 업데이트 프로세스
-```bash
-# 1. 로컬에서 변경사항 개발
-git checkout -b feature/new-feature
-
-# 2. 테스트
-npm run build
-npm start
-
-# 3. Push (자동으로 Preview 배포됨)
-git push origin feature/new-feature
-
-# 4. PR 생성 및 Preview 확인
-
-# 5. 메인 브랜치에 머지 (자동으로 Production 배포)
-git checkout main
-git merge feature/new-feature
-git push origin main
-```
-
----
-
-## 🆘 트러블슈팅
-
-### 빌드 실패
-1. 로컬에서 `npm run build` 테스트
-2. Vercel 빌드 로그 확인
-3. 의존성 버전 확인
-
-### 환경 변수 오류
-1. Vercel Dashboard에서 환경 변수 재확인
-2. "Redeploy" 클릭
-
-### API 키 오류
-1. Groq API 키 유효성 확인
-2. Turnstile 키 도메인 설정 확인
-
-### Rate Limit 문제
-1. `src/lib/rate-limit.ts`에서 제한 조정
-2. IP 화이트리스트 추가 고려
-
----
-
-## 📈 추천 다음 단계
-
-### Phase 1: 안정화 (1주)
-- [ ] 실사용자 피드백 수집
-- [ ] 버그 수정 및 최적화
-- [ ] Analytics 데이터 분석
-
-### Phase 2: 기능 추가 (2-4주)
-- [ ] 추가 캐릭터 개발
-- [ ] 사주 해석 고도화
-- [ ] 대화 히스토리 내보내기
-- [ ] 소셜 공유 기능
-
-### Phase 3: 스케일링 (1-3개월)
-- [ ] DB 연동 (대화 저장)
-- [ ] 사용자 계정 시스템
-- [ ] 프리미엄 기능 (무제한 대화 등)
-- [ ] 다국어 지원
-
----
-
-## 🎉 배포 완료!
-
-배포된 URL: `https://cosmic-whispers.vercel.app`
-
-**축하합니다! 이제 전 세계 사용자들이 별의 속삭임을 경험할 수 있습니다.** 🌟
+[Turnstile 서버 검증](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/) · [Upstash Redis 설정](https://upstash.com/docs/redis/quickstarts/nextjs-app-router) · [Groq 모델 목록](https://console.groq.com/docs/models)
